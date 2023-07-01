@@ -1,0 +1,133 @@
+FileSystems
+
+посекторное копирование:
+dd
+
+disk type is BLOCK
+Таблица разделов: MBR, GPT - разметка разделов
+
+Fdisk -l
+fdisk /dev/sdb
+p - info
+g - make gpt
+n - add new partition
+t - 20 (linux)
+w - write changes
+
+mke2fs -t ext4 -L DATA /dev/sdb1
+
+mount /dev/sdb1 /media/sdb1
+
+
+utilits
+df -h
+df -h /mnt/flashka
+df -ih
+du -hs /opt
+
+lsblk
+blkid
+mount
+ls -laih
+
+информация о текущих используемых разделах (томах)
+cat /proc/partitions
+Обновить информацию о текущих используемых разделах (томах) в /proc/partitions
+partprobe
+
+
+Заполнить диск сгенерированными данными
+dd if=/dev/urandom of=/mnt/flashka/tmp
+
+
+LVM
+
+Hard drives (sda; sdb; sdc), drive partition (sda1; sda2; sdb1; sdc2) включается в PV, PV добавляются в VG, из VG создаются LV, на LV работает ФС
+В linux LV (lvm) лежат в /dev/mapper/vg_name-lv_name 
+Drive Partitions необязательны в Linux, можно использовать весь диск (Hard Drive)
+
+Кратко:
+fdisk -> pvcreate -> vgcreate -> lvcreate -> mkfs, mount
+
+Посмотреть информацию о физически томах (в рамках lvm)
+pvs
+
+Посмотреть информацию о группах томов (в рамках lvm)
+vgs
+
+Посмотреть краткаю информацию о логических томах (в рамках lvm)
+lvs
+
+Scans all supported LVM block devices in the system for physical volumes
+pvscan
+
+Проверяет все поддерживаемые дисковые устройства в системе на предмет наличия физических томов LVM и групп томов
+vgscan
+
+Поиск lv в vg
+lvscan
+
+Расширяем логический том на все свободное новое место
+lvextend -l +100%FREE /dev/data-vg/data-lv
+
+Копрование данных с одного раздела LVM на другие (планируется что sdc будет выводиться)
+pvmove /dev/sdc
+
+Удаление раздела из группы lvm
+vgreduce data-vg /dev/sdc
+
+информация о супер-блоке (размер 1024 байт, информация о файловой системе раздела, находится спустя 1024 байта после начала раздела)
+tune2fs -l /dev/mapper/vg_test-big
+
+Информация о диске sda
+fdisk -l /dev/sda
+
+
+Создать физический том (в рамках lvm)
+pvcrate /dev/sda1
+
+Создать группу для физических томов (разделов)
+vgcreate vg_test /dev/sda1
+
+Создать логический том (раздел)
+lvcreate vg_test -n lv01 -L 100M
+-n название тома
+-L размер тома (мб)
+
+mkfs.ext4 /dev/mapper/vg_test-lv01
+
+Добавляем логический диск в группу (одной командой: иницализирован как физический volume и добавлен в volume group)
+vgextend vg_test /dev/sda2
+
+lvcreate vg_test -n big -L 1500M
+mkfs.ext4 /dev/mapper/vg_test-big
+
+Добавляем место (+100мб) на существующий логический том (увеличить размер логического раздела). Вариант 1
+lvextend /dev/mapper/vg_test-lv01 -L +100M
+resize2fs /dev/mapper/vg_test-lv01
+
+Добавляем место (+100мб) на существующий логический том (увеличить размер логического раздела). Вариант 2
+lvextend /dev/mapper/vg_test-lv01 -L +100M -r       // -r  сделать сразу resize для ext4
+
+Отнять место от логического раздела lvm (ext4) - это печальное действие, может быть потеря файлов
+umount /mnt/01                               // отмонтируем
+e2fsck -f /dev/mapper/vg_test-lv01           // делаем проверку
+resize2fs /dev/mapper/vg_test-lv01 80M       // уменьшаем логический том (раздел) до 80мб
+mount /dev/mapper/vg_test-lv01 /mnt/01       // монтируем
+lvreduce /dev/vg_test/lv01 -L 80M            //
+
+Изменить (увеличить) размер используемого логического тома (раздела) последнего в lvm (dev/sda3) // правильнее изменить последний раздел, чем добавлять новый логический
+fdisk /dev/sda3 -> p -> d (3) -> p -> n -> [enter] -> p (+2G) -> p      // оставить начало раздела, изменить конец (+2G), получаем ошибку раздел используется
+cat /proc/partitions                                                    // видим что раздел на самом деле используется
+partprobe                                                               // перечитываем (обновляем) таблицу разделов
+pvresize /dev/sda3                                                      // обновляем информацию в lvm
+pvs                                                                     // проверяем
+vgs                                                                     // проверяем
+
+
+
+snapshots LVM
+
+
+
+

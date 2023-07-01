@@ -1,0 +1,495 @@
+Работа с пользователями:
+Создать системного пользователя
+useradd -M -r -s /bin/false _userName_
+
+Создать пользователя (обычного)
+useradd — низкоуровневая утилита
+adduser - простая утилита
+
+useradd -m -s /bin/bash _userName_
+
+Задать\сменить пароль
+passwd _userName_
+
+Создать группу
+groupadd _groupeName_
+
+Дать пользователю sudo (Centos)
+usermod -aG wheel _userName_
+
+Дать пользователю sudo (Debian)
+usermod -aG sudo _userName_
+
+Добавить пользоывателя в группу
+usermod -aG _groupeName_ _userName_
+
+Посмотреть инфу о пользователе
+id _userName_
+
+
+Посмотреть кто подключен к серверу
+who или w
+
+
+Полезное ls:
+-d  \\ вывод информации о директрории
+-l  \\ вывод в формате list
+-a  \\ вывод всех файлов (в т.ч. скрытых)
+-i  \\ вывести inodes
+
+ls -la /var/log/n*   //вывод всех файлов, каталогов название которых начинается на n
+
+
+
+
+
+Время \ дата:
+Посмотреть текущую временную зону
+timedatectl status
+
+Посмотреть какие есть
+timedatectl list-timezones
+
+Задать временную зону
+timedatectl set-timezone Europe/Moscow
+
+Chrony
+chronyc -a sources
+chronyc -a tracking
+
+chronyc -a 'burst 4/4'
+chronyc -a makestep
+systemdatectl chronyd
+
+systemdatectl status
+
+
+
+
+Cron:
+crontab
+Список заданий
+	-l
+редактировать задания (в конце обязательно пробел)
+	-e
+
+мин  час  	
+ *    *    *    *    *
+
+
+
+Запуск в фоне
+comand &
+
+Посмотреть список задач
+jobs -l
+Убить задачу в фоне
+kill _номер задачи_
+
+полноценный запуск программы в фоне
+nohup comand args &
+
+
+
+Процессы:
+Убить процесс (sigkill)
+kill -9 id
+
+Завершить процесс (sigterm)
+kill -15 или kill
+
+Посмотреть снимок процессов в памяти
+ps -aux или -efl
+
+
+
+
+
+Работа с сетью:
+
+Сканирование сетевых портов
+nmap
+
+ls /sys/class/net
+cat /proc/net/dev
+конфиги интерфейсов (rhel)
+/etc/sysconfig/network-scripts/
+или через утилиту настройки: nmtui-edit eth1
+
+ifconfig tun0 down\up
+
+выкл\вкл сеть
+nmcli networking off\on
+nmcli connection reload
+
+посмотреть статус подключений
+nmcli d
+nmcli connection show
+
+Выключить интерфейс
+nmcli connection down 'name'
+
+Посмотреть какие программы работают на портах
+ss -tunlp
+
+Посмотреть маршруты
+ip r
+route
+
+Краткая инфа о сетевых интерфейсах
+ip -br a
+
+Создать loopback interface:
+ip addr add 172.16.0.1 dev lo
+route add -host 172.16.0.1 dev lo
+
+
+Firewall (centos):
+Посмотреть список правил
+firewall-cmd --list-all
+
+Добавить порт
+firewall-cmd --add-port=53/udp --permament
+
+Добавить сервис
+firewall-cmd --add-service=http  --permament
+
+Перезапустить firewall
+firewall-cmd --reload
+
+Firewall (ufw):
+sudo ufw status
+ufw allow 8080
+ufw allow OpenSSH
+ufw enable
+
+
+IPTables:
+постоянный конфиг
+/etc/sysctl.conf
+
+Посмотреть таблицу NAT
+iptables -L -nv -t nat
+
+Включить Forwarding в текущий конфиг
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+
+Запустить сервис и добавить его в автозагрузку
+systemctl enable _serviceName_ --now
+
+
+
+Grep:
+grep "что" где
+исключить
+	-v
+рекурсивный поиск
+	-r
+игнорировать регистр
+	-i
+использовать регулярные выражения
+	-E
+
+Пример: Поиск содержимого "Route based on" по всей ОС
+sudo grep -i -r "Route based on" /
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Вызвать терминал
+ctrl+alt+t 
+
+Поис фалов занятых процессом
+lsof
+
+Поиск по файлу\каталогу, какой процесс ег оиспользует
+fuser
+
+посмотреть файловый дискриптор у процессе (куда направлены потоки ввода\вывода\ошибок)
+ls -l /proc/id_process/fd
+
+
+
+
+
+Ubuntu:
+sudo -i   //root
+
+
+
+
+DNF пакетный менеджер
+поиск пакетов 1 вар
+dnf --showduplicates list nginx
+поиск пакетов 2 вар
+dnf search nginx
+
+
+Удалить каталог с отображением что удаляется:
+rm -Rfv каталог
+
+
+
+Посмотреть события в системном жунале
+journalctl -u prometheus.service
+
+
+Узнать что за программа\файл
+which prometheus
+wereis
+whatis
+type
+stat
+
+
+
+
+
+
+
+
+Распаковать архив:
+tar -xvf archive.tar
+tar -xzf archive.tar
+tar -xzv archive.tar
+
+unzip archive.tar
+
+
+Поиск параметров в man (греп по параметрам с кранированием)
+man nginx | grep '\-V'
+
+
+Создать сервис (из бинарника)
+/etc/systemd/system/node_exporter.service
+
+[Unit]
+Description=Nginx Prometheus Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=nginx_exporter
+Group=nginx_exporter
+Type=simple
+ExecStartPost=/bin/sleep 60
+ExecStart=/usr/local/bin/nginx-prometheus-exporter -nginx.scrape-uri=http://localhost:9200/stub_status
+
+[Install]
+WantedBy=multi-user.target
+
+
+Бинарник положить в 
+/usr/local/bin/node_exporter
+После изменения конфигов демонов:
+systemctl daemon-reload
+
+/var/log - логи
+/usr/local/bin/ - пользовательские бинарники
+/etc/systemd/system/ - сервисы
+
+
+
+
+Перезапуск сетевой службы (systemd)
+systemctl restart NetworkManager.service
+
+
+Вызвать хелп
+-h --h
+
+Возвращает статус завершения предыдущей команды (можно посмотреть есть ли ошибки):
+echo $?
+
+Создать группу файлов, можно спользовать сразу VIM
+touch file{1..5}.txt
+
+Удалить файлы по маске в каталоге
+find /home/pavel -maxdepth 1 -name "*.txt" | xargs rm -f 
+
+
+
+
+NGINX
+проверить конфигурацию на ошибки
+nginx -t
+Применить конфигурация без перезапуска сервиса
+nginx -s reload
+
+
+
+
+
+
+
+Утилита копирования файлов с хоста на хоста (по ssh)
+scp
+
+утилита полученя данных по ip 
+whois
+
+Генератор сертов
+mkcert
+
+Применить файл в текущей оболочке
+source /etc/profile.d/proxyserver.sh
+
+
+
+
+
+
+Парсинг текста awk:
+echo 'one thow three four' | awk '{print "foo:",$3"| bar:",$1}'
+awk '{print $1}' /var/log/apache2/access.log
+
+Удалнная синхронизация каталогов\файлов rsync:
+rsync
+
+
+утилита tee:
+Передать текст в файл с помощью tee
+sudo tee /etc/apt/sources.list.d/gitlab_gitlab-ce.list<<EOF
+deb https://packages.gitlab.com/gitlab/gitlab-ce/ubuntu/ focal main
+deb-src https://packages.gitlab.com/gitlab/gitlab-ce/ubuntu/ focal main
+EOF
+
+
+
+
+
+
+SELinux:
+Посмотреть status
+sestatus
+
+Режим работы
+getenforce
+
+Задать режим работы
+setenforce
+
+Вывести политики (можно grep)
+getsebool -a 
+
+Разрежит ьсетевые подключения для httpd:
+setsebool -P httpd_can_network_connect 1
+
+(i) MODE
+enforcing (работает, блокирует)
+permissive (работает, не блокирует, пишет в журнал)
+disabled (0)
+
+
+
+
+
+Работа с текстом:
+
+-= Регулярочки =-
+\ - с обратной косой черты начинаются буквенные спецсимволы, а также он используется если нужно использовать спецсимвол в виде какого-либо знака препинания;
+^ - указывает на начало строки;
+$ - указывает на конец строки;
+* - указывает, что предыдущий символ может повторяться 0 или больше раз;
++ - указывает, что предыдущий символ должен повторится больше один или больше раз;
+? - предыдущий символ может встречаться ноль или один раз;
+{n} - указывает сколько раз (n) нужно повторить предыдущий символ;
+{N,n} - предыдущий символ может повторяться от N до n раз;
+. - любой символ кроме перевода строки;
+[az] - любой символ, указанный в скобках;
+х|у - символ x или символ y;
+[^az] - любой символ, кроме тех, что указаны в скобках;
+[a-z] - любой символ из указанного диапазона;
+[^a-z] - любой символ, которого нет в диапазоне;
+\b - обозначает границу слова с пробелом;
+\B - обозначает что символ должен быть внутри слова, например, ux совпадет с uxb или tuxedo, но не совпадет с Linux;
+\d - означает, что символ - цифра;
+\D - нецифровой символ;
+\n - символ перевода строки;
+\s - один из символов пробела, пробел, табуляция и так далее;
+\S - любой символ кроме пробела;
+\t - символ табуляции;
+\v - символ вертикальной табуляции;
+\w - любой буквенный символ, включая подчеркивание;
+\W - любой буквенный символ, кроме подчеркивания;
+\uXXX - символ Unicdoe.
+
+примеры:
+grep -v "^#" _файлКонфига_    // уберет из поиска все комментарии
+grep -v "^$" _файлКонфига_    // уберет из поиска все пустные строки
+grep -r "\ 80" ./             // экранирует пробел, будет поиск по содержимому (поиск порта 80)
+
+
+
+sort -u // уникальные
+sort -n // сортировка по цифрам (по умолчанию по алфавиту)
+uniq -c // вывести уникальные значения со счетчиком повторений
+
+
+
+
+Примитивный однострочный (двухстрочный) скрипт:
+awk '{print $1}' /var/log/apache2/access.log | sort -u > ./ip.txt
+for i in `cat ./ip.txt` ; do whois $1 | grep -i "country:" uniq | awk '{print $2}' ; done | sort -u | sort uniq -c | sort -n
+
+
+
+
+
+
+Поиск и удаление файлов
+
+Команда find имеет такой синтаксис:
+find [директория] [параметры] критерий шаблон [действие]
+Папка - каталог в котором будем искать
+Параметры - дополнительные параметры, например, глубина поиска, и т д
+Критерий - по какому критерию будем искать: имя, дата создания, права, владелец и т д.
+Шаблон - непосредственно значение по которому будем отбирать файлы.
+
+Основные параметры команды find:
+-P - никогда не открывать символические ссылки.
+-L - получает информацию о файлах по символическим ссылкам. Важно для дальнейшей обработки, чтобы обрабатывалась не ссылка, а сам файл.
+-maxdepth - максимальная глубина поиска по подкаталогам, для поиска только в текущем каталоге установите 1.
+-depth - искать сначала в текущем каталоге, а потом в подкаталогах.
+-mount искать файлы только в этой файловой системе.
+-version - показать версию утилиты find.
+-print - выводить полные имена файлов.
+-type f - искать только файлы.
+-type d - поиск папки в Linux.
+
+Критерии:
+-name - поиск файлов по имени.
+-perm - поиск файлов в Linux по режиму доступа.
+-user - поиск файлов по владельцу.
+-group - поиск по группе.
+-mtime - поиск по времени модификации файла.
+-atime - поиск файлов по дате последнего чтения.
+-nogroup - поиск файлов, не принадлежащих ни одной группе.
+-nouser - поиск файлов без владельцев.
+-newer - найти файлы новее чем указанный.
+-size - поиск файлов в Linux по их размеру.
+
+Пример:
+Find all files having .bak (*.bak) extension in the current directory and remove them:
+find . -type f -name "*.bak" -exec rm -f {} \;
+OR
+find . -type f -name "*.bak" -delete

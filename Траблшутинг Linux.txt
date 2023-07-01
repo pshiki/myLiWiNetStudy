@@ -1,0 +1,171 @@
+Траблшутинг
+tree (дерево каталогов и файлов)
+who
+id
+whoami
+lsof (какие файлы открыты каким процессом)
+lsof -p _procid_                               // посмотреть какие файлы открыты процессом 
+whereis
+locate
+whatis
+which
+type
+getent (получить значения)
+
+vmstat (инфа: память, цп, io, system), (-a расширенная инфа по памяти) 
+
+free (инфа память) -k -m -h
+total = вся ОЗУ - kernel_linux_loaded
+used = используется программами
+free = ненужная память
+shared = пямять для обмена данными между процессами
+buffer\cashe
+available = память доступная для использования
+
+
+
+Информация о памяти:
+cat /proc/meminfo
+	| grep dirty                                 // грязные страницы памяти 
+sync                                             // утилита cинхронизировать (скинуть) грязные страницы памяти на диск
+	inactive = inactive (anon); inactive (file)  // первое что пойдёт на выгрузку из памяти, anon (анонимные) страницы не имееют файлов на диске (появляются в процессе работы процесса), anon идёт в SWAP
+	SwapChached                                  // сколько страниц было выгружено из SWAP в память (обратно)
+
+cat /proc/_id_process_/oom_score                 // счетчик запуска oom killer для процесса
+
+swapon -s (инфа по swap)
+
+SWAPPINESS
+cat /proc/sys/vm/swappiness                      // соотношение (file pages к anon pages) выгрузки страниц из памяти, 0-100 (%), по умолчанию 60. когда 60% файловых страниц будет выгружено, начнётся выгрузка анонимных страниц. Если 100, то будут одновременно выгружаться файл и анон страницы
+
+cat /proc/zoneinfo                               // из архитектуры процессоров: DMA, DMA32 (low, high) активация работы выгрузки в swap 
+
+
+
+watch (просмотор online)
+w (бысто la)
+
+top ([1]-кол-во ядер, [shift]+[>],[<]-сортировка, [shift]+[m]-меню(сортировка), )
+LA - среднее количество процессов в очереди на ожидание ресурсов (1, 5, 15). ядра проц. >= LA. Процессы ждут: либо процессор (la(1)=us+sy+ni), либо устройство ввода\вывода (wa)
+us - user
+sy - system (kernel)
+ni - nice (удобно задать напр. nginx пониженный и отслеживать его)
+id - idle
+wa - wait (i\o)
+hi - hardware iteraction (сбоит железо)
+si - systen iteraction
+st - stolen time (for linux virtualization)
+
+virt - запрошенная у ядра память
+res - фактически испозьзуемая пямять
+S - статус процесса: 
+D (disk) - невоспринимает никакие сигналы, ожидает ответ от диска (ввода\вывода). 
+R (Running), выполняется
+S (sleeping), ожидает (события)
+T (terminate), остановлен
+Z (zombie), процесс зомби
+
+htop
+iotop
+
+ps -aux или -ef или -eF  или r (running) или -efl или -efL // --sort user,pid  |  grep  | less  |  more
+sudo systemctl list-units --state=running
+
+kill -9 _procid_     //исп. в крайнем случае, жестко убивает пооцесс, опасно, сиротки!
+kill -15 _procid_    //исп. поумоляанию, мягко завершает процесс
+
+wc -l
+
+echo $?
+
+ss -tunlp = netstat -tunlp = lsof -i -P
+ip -br a
+ip r = route
+firewall-cmd --list-all
+iptables -L -nv
+ping
+nslookup = host
+dig
+nmap (сканирование поторв)
+nc (netcat) установка соединения, -v -n -z -w 1 x.x.x.x 50-100 (скан портов с 50 по 100 на ip)
+traceroute (ICMP режим)
+traceroute -T (TCP режим)
+mtr = traceroute
+tracepath = traceroute
+telnet x.x.x.x port 
+
+nmcli networking off\on
+nmcli connection reload
+nmcli connection down\up [NIC_NAME]
+ifconfig [NIC_NAME] down\up
+
+ifdown [NIC_NAME]
+ifup [NIC_NAME]
+
+ip link set [NIC_NAME] down\up 
+
+journalctl -u service-name -f
+journalctl -f
+tail -f
+tail -n
+
+lsblk
+lsblk -f //по меткам и UUID
+
+blkid
+
+df -h
+df -i
+
+fdisk -l
+fdisk -x
+
+findmnt
+findmnt --real
+
+du -hs /opt
+
+
+
+LOGS
+
+sealert
+sealert -a /var/log/audit/audit.log
+
+journalctl | grep
+journalctl -b (сообщения с момента загрузки системы)
+
+/var/log/messages
+
+
+
+SySRQ:
+
+
+
+
+Нагрузить систему:
+cpu
+stress
+
+
+hdd
+cat /dev/urandom > /dev/null &
+dd if=/dev/urandom of=/dev/null﻿ &
+
+dd if=/dev/zero of=/dev/null﻿
+
+/dev/urandom | gzip > /dev/null
+
+
+
+from habr
+### CPU ###
+md5sum /dev/urandom - Single thread CPU test
+stress --cpu 4 --timeout 300s - Multi threadCPU test
+cat /dev/zero | bzip2 -c > /dev/null - CPU Stress Test
+
+### HDD ###
+cat /dev/sda3 | pipebench -q > /dev/null - RAW Read Speed Test
+dd bs=16k count=102400 oflag=direct if=/dev/zero of=test_data - Write Test
+dd bs=16K count=102400 iflag=direct if=test_data of=/dev/null - Read Test

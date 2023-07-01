@@ -1,0 +1,14 @@
+Jenkins
+
+рабочая директория:
+/var/lib/jenkins
+Часто её выносят на отдельный примонтированный том
+
+Каталог запуска:
+/var/lib/jenkins/workspace
+
+Каталог для сборок:
+/var/lib/jenkins/jobs
+
+Удалять старые билды:
+config pipeline -> Discard old builds

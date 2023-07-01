@@ -1,0 +1,93 @@
+Команды из видео:
+sudo apt update
+sudo apt upgrade
+sudo apt install postgresql postgresql-contrib
+
+
+проверка статуса
+service postgresql status
+
+
+справка postgresql
+service postgresql
+
+
+войти в запись суперпользователя postgres
+sudo -i -u postgres
+
+
+открыть консоль postgres
+psql
+
+
+Базовые команды:
+список баз данных
+\l 
+
+
+выход из консоли
+\q
+
+
+Создаём свою базу данных:
+createdb <name>
+
+Заходим снова в консоль БД и проверяем наличие БД
+psql
+\l
+\q
+
+
+Удаление БД
+dropdb <name>
+
+
+показать список пользователей
+\du
+
+
+Сменим пароль для пользователя постгрес
+ALTER USER postgres WITH PASSWORD '<password>';
+
+
+Создадим нового пользователя для работы с БД, работать из под рута не рекомендовано
+\du
+CREATE USER <username>  WITH PASSWORD '<pwd>';
+
+
+Теперь дадим права пользователю:
+ALTER USER <username> WITH SUPERUSER;
+
+
+Удалить пользователя
+DROP USER <username>;
+
+
+Выйти из консоли:
+\q
+
+
+Выйти из учётной записи:
+exit или ctrl + D
+
+
+Вызвать справку по postgres:
+man psql
+
+
+Приступим к установке web и графического интерфейса:
+> Install the public key for the repository (if not done previously):
+sudo curl https://www.pgadmin.org/static/packages_pgadmin_org.pub | sudo apt-key add
+
+> Create the repository configuration file:
+sudo sh -c 'echo "deb https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_release -cs) pgadmin4 main" > /etc/apt/sources.list.d/pgadmin4.list && apt update'
+
+
+После предыдущих 2-х шагов можно установить:
+- и web-версию: sudo apt install pgadmin4-web
+- и desktop-версию: sudo apt install pgadmin4-desktop
+- обе сразу: sudo apt install pgadmin4
+
+
+
+Далее будет доступна программа, среди установленных программ

@@ -1,0 +1,738 @@
+Ansible
+
+создать каталог для ansible
+- ansible.cfg
+- hosts (inventory)
+
+ansible --version           //смотрим версию и где конфиг
+
+ansible.cfg
+[defaults]                  //всегда первая
+host_key_checking=false   //отключаем подтверждение по ssh connection
+inventory=./hosts         //указать файл inventory
+
+
+INVENTORY файл
+1) [название группы]
+название машины ansible_host=ip\dns_имя_host   ansible_user=login  ansible_pass=password   ansible_ssh_private_key или ansible_ssh_public_key=путь_для_ключа
+
+2) можно без группы (по default это будет ungrouped)
+
+3) обратиться ко всем: all
+
+4) Вложенность групп:
+[название: children]
+	группы 1
+	группа 2
+	
+5) Можно создать группы переменных для групп. *Если одинаковые данные используются!
+[название группы: vars]
+ansible_user=username       //пример
+
+(i) посмотреть (проанализировать) файл inventory:
+1) ansible-inventory --list
+2) ansible-inventory --graph  //в виде дерева
+
+
+Запуск AD-HOC команд
+ad-hoc команды - это все команды ansible (модули)
+всегда пишем аргумент -m
+
+1) ping
+2) setup                                               //инфа по хостам
+3) shell -a "команда linux" 
+4) command -a "команда linux"                          //не работает: < > ; |
+5) copy -a "src= dest=/путь mode=777"
+6) -b                                                  //если нужен sudo в выполнении команды  (в конце)
+если будет ошибка типа "missing sudo pass" надо проверить, что пользователь в файле /etc/sudoers с правами username ALL = (ALL) NO PASSWD:ALL (см. visudo), или в конце команды добавить -b --ask-become-pass
+7) file                                                //можно создавать файлы\директории и удалять их
+Пример:
+file -a "path=/путь/файл state=absent" -b
+(i) см. вывод: 
+
+         / true  (выполенено)
+changed -
+         \ false (не выполенено)
+		 
+8) get_url                                             //скачать файл на хост(ы)
+Пример:
+get_url -a "url=http://... dest=/foo/bar/" -b
+9) yum                                                 //установить программу
+yum -a "name=stress state=installed\removed" -b
+10) curl
+Пример:
+uri -a "url=https://адрес"
+uri -a "url=https://адрес return_content=yes"
+11) Запустить service и добавить его в автозагрузку:
+Пример:
+service -a "name=название state=started enabled=yes" -b
+
+(i) debug на все задачи (модули):
+в конце команды: -v -vv -vvv -vvvv -vvvvv             //с каждой v будет больше информации
+
+(i) вывести все модули ansible:
+ansible-doc -l
+
+
+ПРАВИЛА ФОРМАТА YAML
+
+Все yaml файлы начинаются с:
+---
+Заканчиваются на (опционально):
+...
+
+пример:    //в yaml важны пробелы!
+
+ - fruits:
+     - apple
+	 - mango
+	 - orange
+	
+ - vegetables:
+     - tomato
+	 - potato
+	 - carret
+	 
+ - vasya
+     nick: vasyan
+	 position: developer
+	 skills:
+	   - php
+	   - python
+	   - perl
+	   
+ - petya:
+     nick: "petya: krutoy"
+	 position: manager
+	 skills:
+	   - management
+	   - hr
+	 
+	 
+ - kolya: { nick: kolyan, skills: ['admin', 'devops'] }	 
+ 
+ fruits: ['apple', 'orange', 'mango']
+ 
+
+
+
+
+ПРОСТОЙ ПРОФЕССИОНАЛЬНЫЙ YAML ФАЙЛ (playbook)
+
+Описание: вводит переменные. Устанавливает Apache. Копирует файл index.html на серверы, если при повторном запуске видит изменения (changed: true). Сделает рестарт сервиса. Запустит сервис и сделает автозагрузку.
+
+playbook.yml
+---
+- name: install apache and upload index page
+  hosts: all
+  become: yes
+  
+  vars:                                                                //переменные
+    source_file: ./MyWebSite/index.html
+	destin_file: /var/www/html
+	
+  tasks:                                                               //задачи на выполнение
+  - name: install apache web server
+    yum: name=httpd state=latest
+	
+  - name: Copy MyHomePage to Servers
+    copy: src={{ source_file }} dest={{ destin_file }} mode=555
+	notify: Restart Apache                                             //рестарт если были изменения
+	
+  - name: start webserver and make it enable on boot
+    service: name=httpd state=started enabled=yes
+	
+  handlers:                                                            //типо условие (без запуска по умолчанию)
+  - name: Restart Apache
+    service: name=httpd state=restarted
+	
+
+
+
+
+ПРОФЕССИОНАЛЬНЫЙ INVENTORY ФАЙЛ
+В файле invenory не должно быть групповых переменных. Групповые переменные выносятся в отдельный файл для каждой группы и кладутся в каталог: group_vars.
+
+ПРИМЕР:
+PROD_SERVERS
+---
+ansible_user: ansible
+
+Если нужно указать специфическую переменную для конкретного хоста, то её можно прописать в inventory файле стандартным способом
+
+
+
+
+ПЕРЕМЕННЫЕ, DEBUG, SET_FACT, REGISTER
+
+Посмотреть глобальные переменные ansible для ВСЕХ хостов (данные по серверам, по всем хостам), данные переменные можно использовать:
+ansible all -m setup
+
+пример использования 1:
+ - shell: uptime
+   register: result
+ - debug:
+     var: result
+
+пример использования 2 (вывести непосредственно сам stdout выполнения команды):
+ - debug:
+     var: result.stdout
+
+пример использования 3 (вывести версию linux по всем хостам в inventory):
+ - debug:
+     var: ansible_distribution
+
+переменные можно задать в:
+ - playbook
+ - inventory
+ 
+В playbook   //будут относиться ко всему playbook
+vars:
+  peremennaya1: Privet
+  peremennaya2: World
+  secret: pa$$w0rd
+  
+debug позволяет вывести значение переменной, задаётся прямо в playbook
+ - name: Print variable peremennaya1
+   debug:
+     var: peremennaya1
+	 
+ - name Print variable peremennaya2 with some text
+   debug:
+     msg: "Hello {{ peremennaya2 }}"
+ 
+
+Объеденить переменные:
+ - set_fact: vse_peremennie = {{ peremennaya1 }} {{ peremennaya2 }} {{ secret }}
+ - debug:
+     var: vse_peremennie
+
+
+
+
+
+БЛОКИ И УСЛОВИЯ. BLOCKS AND WHEN.
+
+(i) Полезная переменная (глобальная):  // выводит семейство ОС Linux (можно использовать для написания playbook)
+debug: var = ansible_os_family
+
+WHEN
+when используется как условие для выполнения task в конкретной задаче или блоке (block)
+
+1. Использование when в task (конкретной задаче)
+Пример playbook:
+---
+- name: Install Apache and upload homepage
+  hosts: all
+  become: yes
+  
+  vars:
+    source_file: ./MyWebSite/index.html
+	destin_file: /var/www/html
+
+  tasks:
+    - name: check and print linux faminy version
+      debug: var=ansible_os_family
+	 
+    - name: install apache server for RedHat
+      yum: name=httpd state=latest
+	  when: ansible_os_family == "RedHat"
+	 
+    - name: install apache server for Debian
+      apt: name=apache2 state=latest
+	  when: ansible_os_family == "Debian"
+
+    - name: copy Homepage file to web server
+	  copy src={{ source_file }} dest={{ destin_file }} mode=0555
+	  
+	- name: Start web server service for RedHat
+	  service: name=httpd state=started enabled=yes
+	  when: ansible_os_family == "RedHat" 
+	
+	- name: Start web server service for Debian
+	  service: name=apache2 state=started enabled=yes
+	  when: ansible_os_family == "Debian"
+	  
+	handlers:
+	- name: Restart apache RedHat
+	  service: name=httpd state=restarted
+	
+	- name: Restart apache Debian
+	  service: name=apache2 state=restarted
+	 
+	 
+(i) 
+ == соответствует
+ != не соответствует
+	
+	
+Пример: Оптимизация предыдущего примера, с использованием BLOCKS
+Блоки позволяют группировать tasks (задачи) для одинаковых условий и использовать when один раз (в конце блока)
+---
+- name: Install Apache and upload homepage
+  hosts: all
+  become: yes
+  
+  vars:
+    source_file: ./MyWebSite/index.html
+	destin_file: /var/www/html
+
+  tasks:
+    - name: check and print linux faminy version
+      debug: var=ansible_os_family
+	
+  - block:   # ===block for REDHAT=== 	
+      - name: install apache server for RedHat
+        yum: name=httpd state=latest
+	  
+	  - name: copy Homepage file to web server
+	    copy src={{ source_file }} dest={{ destin_file }} mode=0555
+		notify: Restart apache RedHat
+		
+	  - name: Start web server service for RedHat
+	    service: name=httpd state=started enabled=yes
+	    
+	when: ansible_os_family == "RedHat"
+	
+  - block:   # ===block for DEBIAN=== 
+      - name: install apache server for Debian
+        apt: name=apache2 state=latest
+
+      - name: copy Homepage file to web server
+	    copy src={{ source_file }} dest={{ destin_file }} mode=0555
+		notify: Restart apache Debian
+	
+	  - name: Start web server service for Debian
+	    service: name=apache2 state=started enabled=yes
+	  
+	when: ansible_os_family == "Debian"
+	  
+  handlers:
+  - name: Restart apache RedHat
+	service: name=httpd state=restarted
+	
+  - name: Restart apache Debian
+	service: name=apache2 state=restarted
+
+
+(i) block можно вкладывать в block
+
+
+
+
+ЦИКЛЫ: LOOP, WITH_ITEMS, UNTIL; WITH_FILEGLOB
+
+loop = with_items  // с ver. 2.5 использование loop использует заданные значения в цикле
+
+tasks:
+ - name: Say Hello
+   debug: msg="hello {{ item }}"
+   loop:                            // тут можно использовать with_items
+     - "Vasya"
+	 - "Petya"
+	 - "Masha"
+	 
+
+until                               // повторный цикл 
+
+ - name: Loop until example
+   shell: echo -n Z >> myfile.txt && cat myfile.txt
+   register: output                                    // занести в переменную
+   delay: 2                                            // задержка
+   retries: 10                                         // кол-во повторений
+   until: output.std.find ("ZZZZ") == false            // остановиться когда в output будет ZZZZ
+   
+ - name: Print output final
+   debug:
+     var: output.stdout
+	 
+
+Пример 1. Установка пакетов.
+
+ - name: Install many packeges
+   yum: name= {{ item }} state=installed
+   with_items:                                 //можно использовать loop
+     - python
+	 - tree
+	 - sql_client
+	 - vim
+
+Пример 2.1 Копирование множества файлов (с перечислением)
+
+ - name: Copy many files (folder) to servers
+   hosts: all
+   become: yes
+   
+   vars:
+     source_folder: ./myfolder
+	 destin_folder: /var/www/html
+	 
+   tasks:
+     - name: Copy many files (with loop) to servers
+	   copy: src={{ source_folder }}/{{ item }} dest={{ desin_folder }} mode=0555
+	   
+	   loop:
+	     - "index.html"
+		 - "picture1.png"
+		 - "picture2.png"
+		 
+	   notify:
+	     - Restart apache RedHat
+		 - Restart apache DEBIAN
+		 
+ handlers:                                 // модернизируем рестарт сервиса по изменениям файлов для разных ОС
+   - name: Restart apache RedHat
+	 service: name=httpd state=restarted
+	 when: ansible_os_family == "RedHat"
+	
+   - name: Restart apache Debian
+	 service: name=apache2 state=restarted
+	 when: ansible_os_family == "Debian"
+	 
+	 
+Пример 3. Копирование множества файлов без перечисления (каталог целиком)
+
+ - name: Copy all files from folder (with loop) to server
+   copy: src={{ item }} dest={{ destin_folder }} mode=0555                       //destin_folder - это var
+   with_fileglob: "{{ source_folder }}/*.*"   
+
+
+
+
+
+ШАБЛОНЫ JINJA TEMPLATES
+Формат Jinja2. Имеет расширение .j2 
+С помощью шаблонов можно "генерировать файл(ы)" для каждого хоста энсибл.
+
+(i) Можно брать переменные глобальные: ansible all -m setup
+
+1. Надо переименовать файл в *.j2
+2. Редактируем файл шаблона *.j2
+3. переменные вносятся в шаблон в формате: {{ Nazvanie_peremennoi }}
+4. В Playbook добавляем задачу генерации по шаблону:
+ - name: Generate file by ansible
+   template: src=./templates/index.j2 dest=/var/www/html/index.html mode=0555
+   notify:                                                                         // если нужен перезапуск при изменении файлов
+ 	 - Restart apache RedHat
+     - Restart apache DEBIAN
+
+
+
+
+
+РОЛИ. ROLES
+
+В роль распределяется playbook по кускам.
+
+ansible-galaxy init название
+
+  название:
+  |
+  |- defaults
+  |- files
+  |- handlers
+  |- meta
+  |- tasks
+  |- templates
+  |- tests
+  |- vars
+   
+название - каталог с подкаталогами
+
+Вызывается запуском playbook, указав в нём название роли:
+---
+ - name: Название
+   hosts: all
+   become: yes
+   
+   roles:
+     - { role: название, when ansible_system == 'Linux' }       //условие, если ОС == Linux
+	 
+	 
+	 
+
+ВНЕШНИЕ ПЕРЕМЕННЫЕ. EXTRA-VARS
+
+Внешние переменные задаются в запуске playbook:
+                                --extra-var
+  ansible-playbook playbook.yml --extra-vars     название=prod\dev     //название=prod\dev - это группы из inventory
+                                -e
+								
+Можно использовать например в:
+playbook.yml
+---
+ - name: "{{ название_переменной }}" 
+ 
+
+(i) переменные в extra-vars имеют наивысший приоритет
+(i) При запуске playbook можно задавать множество переменных:
+    -e "название1=значение название2=значение2"
+	
+	
+	
+	
+	
+ИСПОЛЬЗОВАНИЕ IMPORT, INCLUDE
+Можно разбить playbook на части и далее их подключить при необходимости
+
+1. Create_folders.yml
+---
+ - name: create folder1
+   file:
+     path: /home/sercret/folder1
+	 state: directory
+	 mode: 0755
+	 
+ - name: create folder2
+   file:
+     path: /home/sercret/folder2
+	 state: directory
+	 mode: 0755
+
+2.  Create_files.yml
+---
+ - name: create file1
+   copy:
+     dest: /home/secret/file1.txt
+     content: |
+       text line 1, in file1
+       text line 2, in file1
+       text line 3, {{ mytext }}
+
+ - name: create file2
+   copy:
+     dest: /home/secret/file2.txt
+     content: |
+     textline1, in file2
+     textline2, {{ mytext }}
+
+3. Запуск через playbook (можно использовать include или import), - name использовать необязательно
+
+ tasks:
+   - name: Create_folders
+     include: create_folders.yml
+
+   - name: Create_files
+     import: create_files.yml
+
+
+(i) iclude vs import
+import сразу проверяет синтаксис и копирует содержимое файла сразу .yml
+include копирует содержимое .yml в task, когда доходит до include
+
+(ii) лучше использовать include
+
+(iii) в import / include можно сразу использовать переменные, в одной строке, при вызове task:
+пример:
+include: create_files.yml mytext = "Hello World"
+
+
+
+
+
+
+ПЕРЕНАПРАВЛЕНИЕ ВЫПОЛНЕНИЯ TASK ИЗ PLAYBOOK НА ОПРЕДЕЛЕННЫЙ СЕРВЕР - DELEGATE_TO
+
+(i) можно запустить task на определённых хостах и даже на самом ansible master.
+
+1) За запуск на хосте (конкретном) отвечает:
+
+             hostname from inventory
+delegate_to:
+             127.0.0.1   //будет запуск на мастере
+
+2) Запуск однократно на первом хосте:
+
+run_once: true
+
+
+Примеры:
+
+1) Создание файла на конкретном хосте из всех в inventory
+ - name: Create file only on once host
+   copy:
+     dest: /var/files/file1
+     content:
+       This file
+       on Russian {{ my_text }}   // переменные определяются выше, в блоке vars:
+
+     delegate_to: linux_host3     // определяется в inventory
+
+2) Вывод хоста из кластера, запись результата только на Master:
+ - name: unregister server from LoadBalancer
+   shell: echo Server {{ inventory_hostname }} was derigistered, name node is {{ ansible_nodename }} >> /home/log
+
+   delegate_to: 127.0.0.1 или localhost
+
+(i) сообщение будет записано только в master
+
+3) Перезагрузка хостов с ожиданием подключения
+3.1) Старый вариант
+- name: Reboot my servers
+  shell: sleep 3 && reboot now
+  async: 1
+  poll: 0   //не держать открытую сессию
+- name: Wait when servers will come up
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    state: started
+    deley: 5
+    timeout: 40
+  delegate_to: 127.0.0.1
+
+3.2) Новый вариант (с версии 2.7)
+- name: Reboot servers
+  reboot:
+    reboot_timeot: 700     // по default = 600
+
+4) Обновление БД, только на одном хосте из inventory, только единожды, не важно на каком (конкретном) хосте
+- name: Update db once only in anyone host from inventory
+  shell: echo updating db
+  run_once: true
+
+
+
+
+ПЕРЕХВАТ И КОНТРОЛЬ ОШИБОК. КОНТРОЛЬ ПО DEBUG
+
+Позволяет отслеживать на каких хостах какие task - failed
+
+Если task = faild, далее task не выполняется!
+
+Пример 1: Сделать продолжение выполнения task, если ошибка в одном task'е
+playbook_errorhandling.yml
+- name
+  hosts: all
+  become: yes
+  
+  tasks:
+    yum: name=treeee state=latest       //пакет treeee несуществует
+	ignore_errors: yes
+	shell: echo "Hello World!"
+	
+Пример 2.1 Контроль выполнения. Выполнение дальше в зависимости о трезультатов выполнения task
+- name: Task fail when WORLD will FOUND
+  shell: echo Hello World!
+  register: result                     //нужно для debug (запись в переменную)
+  field_when: "'world' in result.stdout"
+
+- debug:
+    var: result
+	
+- name: Second Task                    // !!!  Не будет выполнен
+  shell: echo "Privet Mir!" 
+
+Пример 2.2 Контроль Выполнения по exit status code
+field_when: result.rc == 0             // !!! Следущий Task не будет выполнен  
+
+Пример 3. Остановить выполнение playbook на всех hosts, если при выполнении на одном host возникла fail
+В начале (в шапке) playbook добавить:
+- name:
+  hosts: all
+  any_error_fatal: true               // параметр заставляющий остановить playbook 
+  become: yes
+  
+  tasks:
+   ---
+   ---
+   ---
+
+(i) ПОЛНОЕ прекращение выполнения всех остальных tasks если хоть где нибудь есть ошибка.
+
+
+
+
+
+
+
+
+
+
+ХРАНЕНИЕ СЕКРЕТОВ. ANSIBLE-VAULT
+
+ansible-vault создаёт зашифрованный файл
+
+Пример создания:
+1) ansible-vault create mysecret.txt
+2) ввести пароль (для дешифрования)
+
+Просмотр файла:
+1) ansible-vault view mysecret.txt
+2) ввести пароль
+
+Редактирование файла:
+1) ansible-vault edit mysecret.txt
+2) ввести пароль
+
+Сменить пароль для дешифрования файла:
+1) ansible-vault rekey mysecret.txt
+2) ввести текущий пароль
+3) ввести нвоый пароль
+
+Зашифровать Playbook:
+1) ansible-vault encrypt playbook.yml
+2) ввести пароль
+
+Посмотреть зашифрованный playbook:
+1) ansible-vault view playbook.yml
+2) ввести пароль
+
+Расшифровать playbook:
+1) ansible-vault decrypt playbook.yml
+2) ввести пароль
+
+Запуск зашифрованного playbook:
+1) ansible-playbook playbook.yml --ask-vault-pass
+2) ввести пароль
+
+(i) Пароль для decryption можно указать в файле:
+1) Создать файл и в нём записать пароль
+2) ansible-playbook playbook.yml --vault-password-file pass.txt
+
+ПРИМЕР 1. Шифрование строк в переменных. Можно прямо в playbook спрятать  пароль
+1) ansible-vault encrypt_string --stdin_name "MyPassWoRd"                                  //необязательно использовать --stdin_name.....
+2) ввести пароль для дешифрования
+3) вводим шифруемый текст (свой пароль из playbook)
+4) жмем ДВА раза ctrl+d
+5) получаем зашифрованный текст, который можно вставить в значение переменной playbook     //начинается с !vault
+6) Запуск playbook с шифрованной переменной:
+   ansible-playbook playbook.yml --ask-vault-pass
+   
+ПРИМЕР 2. Шифрование строк в переменных, где угодно!
+1) echo -n "SecretWord" | ansible-vault encrypt-string
+2) ввести пароль
+3) !vault    - начало зашифрованной "secretWord"
+(i) все шифрования надо делать одним паролем
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
