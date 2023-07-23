@@ -27,3 +27,15 @@ n{4,6} - искать n от 4 до 6
 () - группировка
 (^) - отрицание (не)
 (|) - или
+
+(<spec>)([^#<]+)(<\/spec>)
+(<spec>)([^#<]+|)(<\/spec>)
+<spec>H * * 2 0</spec>
+<spec>* * * 2 0</spec>
+<spec>H H * 0 0</spec>
+<spec>#* * * 2 0</spec>
+<spec>#H H * 0 0</spec>
+<spec>1</spec>
+<spec>H</spec>
+<spec>#</spec>
+<spec></spec>
