@@ -6,6 +6,10 @@ Ansible
 
 ansible --version           //смотрим версию и где конфиг
 
+-D  -- diff
+-c  -- тестовая прокатка
+
+ 
 ansible.cfg
 [defaults]                  //всегда первая
 host_key_checking=false   //отключаем подтверждение по ssh connection
