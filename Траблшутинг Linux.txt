@@ -45,25 +45,6 @@ cat /proc/zoneinfo                               // из архитектуры 
 watch (просмотор online)
 w (бысто la)
 
-top ([1]-кол-во ядер, [shift]+[>],[<]-сортировка, [shift]+[m]-меню(сортировка), )
-LA - среднее количество процессов в очереди на ожидание ресурсов (1, 5, 15). ядра проц. >= LA. Процессы ждут: либо процессор (la(1)=us+sy+ni), либо устройство ввода\вывода (wa)
-us - user
-sy - system (kernel)
-ni - nice (удобно задать напр. nginx пониженный и отслеживать его)
-id - idle
-wa - wait (i\o)
-hi - hardware iteraction (сбоит железо)
-si - systen iteraction
-st - stolen time (for linux virtualization)
-
-virt - запрошенная у ядра память
-res - фактически испозьзуемая пямять
-S - статус процесса: 
-D (disk) - невоспринимает никакие сигналы, ожидает ответ от диска (ввода\вывода). 
-R (Running), выполняется
-S (sleeping), ожидает (события)
-T (terminate), остановлен
-Z (zombie), процесс зомби
 
 htop
 iotop
