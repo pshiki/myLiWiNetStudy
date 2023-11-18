@@ -9,7 +9,7 @@ whereis
 locate
 whatis
 which
-type
+type -a
 getent (получить значения)
 
 vmstat (инфа: память, цп, io, system), (-a расширенная инфа по памяти) 
