@@ -111,10 +111,10 @@ docker build .
   -t mycontainer:4.1.3
 если не указать тэг, то будет автоматом поставлен latest
 
-() Копировать dockerfile внутрь образа не нужно, можно и не копировать любые другие файлы из WORKDIR, для этого используют файл:
+(ii) Копировать dockerfile внутрь образа не нужно, можно и не копировать любые другие файлы из WORKDIR, для этого используют файл:
 .dockerignore
 
-
+(iii) --no-cache
 
 DOCKER COMPOSE
 Используется декларативный подход.
@@ -334,6 +334,8 @@ docker run
        contaiter prune
        login
        image prune -a
+       system prune
+       history
 ---------==============---------
 ---------==============---------
 docker-compose up\down -d
