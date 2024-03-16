@@ -17,39 +17,13 @@ type -a
 getent (получить значения)
 strace
 strace -e open pwd   // трассировка отбразения к файлам
-
+sysctl -a    ///Посмотреть параметры системы
 vmstat (инфа: память, цп, io, system), (-a расширенная инфа по памяти) 
-
-free (инфа память) -k -m -h
-total = вся ОЗУ - kernel_linux_loaded
-used = используется программами
-free = ненужная память
-shared = пямять для обмена данными между процессами
-buffer\cashe
-available = память доступная для использования
-
-
-
-Информация о памяти:
-cat /proc/meminfo
-	| grep dirty                                 // грязные страницы памяти 
-sync                                             // утилита cинхронизировать (скинуть) грязные страницы памяти на диск
-	inactive = inactive (anon); inactive (file)  // первое что пойдёт на выгрузку из памяти, anon (анонимные) страницы не имееют файлов на диске (появляются в процессе работы процесса), anon идёт в SWAP
-	SwapChached                                  // сколько страниц было выгружено из SWAP в память (обратно)
-
-cat /proc/_id_process_/oom_score                 // счетчик запуска oom killer для процесса
-
-swapon -s (инфа по swap)
-
-SWAPPINESS
-cat /proc/sys/vm/swappiness                      // соотношение (file pages к anon pages) выгрузки страниц из памяти, 0-100 (%), по умолчанию 60. когда 60% файловых страниц будет выгружено, начнётся выгрузка анонимных страниц. Если 100, то будут одновременно выгружаться файл и анон страницы
-
-cat /proc/zoneinfo                               // из архитектуры процессоров: DMA, DMA32 (low, high) активация работы выгрузки в swap 
-
+free -h
 
 
 watch (просмотор online)
-w (бысто la)
+w (кратная информация о системе)
 
 
 htop
@@ -60,6 +34,8 @@ sudo systemctl list-units --state=running
 
 kill -9 _procid_     //исп. в крайнем случае, жестко убивает пооцесс, опасно, сиротки!
 kill -15 _procid_    //исп. поумоляанию, мягко завершает процесс
+pkill 
+
 
 wc -l
 
@@ -91,8 +67,7 @@ ifup [NIC_NAME]
 
 ip link set [NIC_NAME] down\up 
 
-journalctl -u service-name -f
-journalctl -f
+
 tail -f
 tail -n
 
@@ -121,8 +96,16 @@ sealert -a /var/log/audit/audit.log
 
 journalctl | grep
 journalctl -b (сообщения с момента загрузки системы)
-
+journalctl -k сообщения ядра
+journalctl -u service-name -f
+journalctl -f
 /var/log/messages
+
+dmesg
+      -k  only kernel logs
+      -l  ограничить вывод указанным уровнем подробности
+      -T  выводить время в удобном для человека формате
+      -H  включить вывод, удобный для человека
 
 
 
