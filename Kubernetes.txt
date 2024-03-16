@@ -1,1 +1,13 @@
  
+kubectl
+
+kubectl
+         status-info
+         get nodes
+         get pods
+         get componentstatuses
+
+
+keys:
+
+      --n <namespace>
