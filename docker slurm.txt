@@ -19,7 +19,17 @@ docker rm -f _containerName_
 
 docker run -d -p 8080:80 -v $PWD/default.conf:/etc/nginx/conf.d/default.conf nginx:1.13
 
-docker run -e 'VARIABLE=value' nginx:1.12
+-e или --env записывают переданные переменные среды в самой системе контейнера. Так же есть ключ --env-file - записывает в переменные окружения все данные из файла
+docker run -e 'VARIABLE=value' nginx:1.12 
+
+--link позволяет связать несколько контейнеров по сети, таким образом из одного контейнера можно будет обращаться в другой контейнер по dns и порту
+--link docker:docker  
+
+--name docker   задать имя контейнеру "docker"
+
+--link db:db    --link name:alias. name — имя контейнера, alias — имя, под которым этот контейнер будет известен запускаемому
+
+--privileged    привилегированный режим
 
 
 
@@ -89,4 +99,54 @@ CMD python /app/app.py
 --default-ulimit
 --dns
 --insecure-registry
+
+
+
+Задание 2.12
+docker run --name docker --privileged -e DOCKER_TLS_CERTDIR= -d docker:24.0.4-dind
+
+
+
+
+
+3.1 Docker-compose
+
+
+Пример docker-compose.yaml
+---
+version: '2.1'     //в примере специально используется устаревшая версия, в ней есть healthcheck и dependes_on
+
+services:
+  db:
+    image: postgres:12.6
+    command: -c fsync=off -c full_page_writes=off
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 1s
+      timeout: 1s
+      retries: 60
+  web:
+    image: ${CI_REGISTRY:-registry.slurm.io}/${CI_PROJECT_NAMESPACE:-slurm}/${CI_PROJECT_NAME:-demo}:${CI_COMMIT_REF_SLUG:-local}.${CI_PIPELINE_ID:-1}      //:-"значение по умолчанию", которое будет выполнено в случае отсутсвия заданной переменной
+    environment:
+      DB_NAME: test
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+cd dir
+docker-compose up
+                   -d   //start containers in background
+
+docker-compose down
+
+  
+
+
 
