@@ -16,7 +16,25 @@
     info - информационный
    debug - отладочные сообщения
 
+
+dmesg
+facilities (categories):
+kern. Kernel messages.
+user. User-level messages.
+mail. Mail system messages.
+daemon. Messages about system daemons.
+auth. Authorization messages.
+syslog. Internal syslogd messages.
+lpr. Line printer subsystem messages.
+news. Network news subsystem messages.
+
+
+sudo dmesg -T     //Enable Human-Readable Timestamps
+sudo dmesg -L     //Display Colored Messages
+dmesg -f syslog   //Limit dmesg Output to a Specific Facility (categories)
+
 dmesg -l err 
+
 
 
 /var/log/alternatives.log — Вывод программы update-alternatives, в котором находятся символические ссылки на команды или библиотеки по умолчанию.

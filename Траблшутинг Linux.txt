@@ -1,4 +1,68 @@
-Траблшутинг
+LA - среднее количество процессов и операций ввода\вывода в прцоессорной очереди
+
+Траблшутинг base (new)
+w
+uptime
+
+HDD:
+df -h
+df -i
+du -hs /tmp/*
+lsblk
+smartctl -a /dev/...
+fdisk -l
+iostat
+iotop
+cat /proc/mdstat   //soft raid
+
+RAM:
+free -h
+vmstat
+cat /proc/memstat
+slabtop
+
+PROC:
+ps -aux -efl
+pgrep -a java
+strace ls
+strace -p xxxxx
+top
+systemctl status
+
+LAN
+ping
+netstat -tunlp
+netstat -rn
+ss -lntu
+ifconfig
+ip a
+ip r
+tracerout 
+mtr
+nslookup
+dig domain.com
+dig @8.8.8.8 domain.com
+dig -t mx domain.com
+host
+tcpdump -i any port 9100 -nn
+telnet _ip_ _port_
+curl -ivk host\ip:port
+curl -Lv host
+curl --unix-socket /var/run/docker.sock http://images/json
+
+LOGS:
+journalctl -u -p -k
+journalctl -xeu nginx
+dmesg -T -L | grep -i usb
+/var/log/messages
+/var/log/syslog
+/var/log/auth.log
+/var/log/kern.log
+
+
+
+
+Траблшутинг (old)
 tree (дерево каталогов и файлов)
 who
 id
@@ -24,10 +88,12 @@ free -h
 
 watch (просмотор online)
 w (кратная информация о системе)
+uptime
 
 
 htop
 iotop
+slabtop
 
 ps -aux или -ef или -eF  или r (running) или -efl или -efL // --sort user,pid  |  grep  | less  |  more
 sudo systemctl list-units --state=running
