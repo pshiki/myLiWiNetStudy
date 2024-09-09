@@ -78,12 +78,14 @@ locate
 whatis
 which
 type -a
+hash
 getent (получить значения)
 strace
 strace -e open pwd   // трассировка отбразения к файлам
 sysctl -a    ///Посмотреть параметры системы
 vmstat (инфа: память, цп, io, system), (-a расширенная инфа по памяти) 
 free -h
+
 
 
 watch (просмотор online)
