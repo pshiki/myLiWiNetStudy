@@ -1,0 +1,33 @@
+
+
+2.1.2 Запускаем Pod
+Создать pod
+kubectl create -f pod.yaml
+Посмотреть поды
+kubectl get pods
+Удалить pods 
+kubectl delete pod --all
+
+2.1.3 Самостоятельная работа
+Запустите в кластере pod из образа busybox:latest c командой sh -c 'while true; do echo New random number is $(( ( RANDOM % 100 )  + 1 )); sleep 2; done'  и именем hello
+
+---
+# file: practice/2.application-abstractions/1.pod/pod-sam.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hello
+spec:
+  containers:
+  - image: busybox:latest
+    name: hello
+    command: ["/bin/sh"] 
+    args: ["-c", "while true; do echo New random number is $(( ( RANDOM % 100 )  + 1 )); sleep 2; done"]
+...
+
+
+Посмотреть логи pod'а:
+kubectl logs hello
+
+Удалить конкретный pod:
+kubectl delete pod hello
