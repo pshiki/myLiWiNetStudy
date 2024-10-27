@@ -268,7 +268,9 @@ kubectl create ns student
 kubectl -n student apply -f deployment.yaml
 kubectl -n student get pod
 
+kubectl delete deployments.apps -n student --all
 
+kubectl delete deployment --all
 
 
 
@@ -277,6 +279,49 @@ kubectl -n student get pod
 
 2.5.1 Resources
 
+В Kubernetes ресурсы делятся на два типа:
+
+    Реквесты (Requests) — это минимальное количество ресурсов, которое будет зарезервировано под приложение в кластере. Эти ресурсы гарантированно будут доступны приложению.
+    Лимиты (Limits) — это максимальное количество ресурсов, которое под может использовать. Лимиты устанавливают верхнюю границу, выше которой ресурсы не будут выделяться.
+
+При превышении лимитов, например, при попытке приложения использовать больше оперативной памяти, включается механизм Out of Memory Killer (OOM Killer) для контейнера
+
+В соотвествии с указанными Requests кубер раскидывает pods по workers кластера
+
+Проц: 1 ядро = 1000m (мили цпу)
+cpu: 100m это 1\10 одного ядра (процессорного времени)
+
+Память: 1Gi = 1024 мегабайт
+        1GB = 1000 мегабайт
+
+По соотношению request и limmit кубер пристваивает QoS Class, который можно увидеть в describe
+
+QoS Class:
+Garanteed - request = limmit (самый приоритетный)
+Этот класс применяется, когда реквесты и лимиты равны между собой для CPU и памяти. В таком случае поду гарантируется выделение всех запрошенных ресурсов. Поды с классом Guaranteed имеют наивысший приоритет и сохраняются на ноде в первую очередь при возникновении дефицита ресурсов.
+
+Burstable - request < limmit
+Этот класс применяется, когда реквесты меньше, чем лимиты. В некоторых случаях под может использовать и больше ресурсов, если они доступны. Например, если приложение зарезервировало себе 100 mCPU, но при наличии свободных ресурсов оно может использовать до 200 mCPU, если в лимите указано это значение. Однако такие поды имеют более низкий приоритет, чем Guaranteed, то есть при нехватке ресурсов на ноде Kubernetes сначала начнет переселять поды класса Burstable на другие ноды, в то время как поды класса Guaranteed будут сохраняться дольше всего.
+
+Bestapport - no limmit
+Этот класс назначается, когда лимиты не заданы. Приложение может использовать любые доступные ресурсы, но при этом имеет наименьший приоритет. В случае дефицита ресурсов на ноде, поды класса Best Effort будут переселяться в первую очередь.
+
+
+info:
+kubectl delete all --all-namespaces --all   =   kubectl delete all -A --all   =   rm -rf /
+
+
+
+2.5.3 Практика
+
+cd ~/slurm/practice/2.application-abstractions/4.resources/
+kubectl apply -f deployment-with-resources.yaml
+kubectl get pod
+kubectl patch deployment my-deployment --patch '{"spec":{"template":{"spec":{"containers":[{"name":"nginx","resources":{"requests":{"cpu":"10"},"limits":{"cpu":"10"}}}]}}}}'
+kubectl get pod
+kubectl describe pod my-deployment-5b98d9cdff-jnwqv
+
+kubectl delete deployment --all
 
 
 
@@ -285,25 +330,7 @@ kubectl -n student get pod
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+3.1.1 Переменные окружения
 
 
 
