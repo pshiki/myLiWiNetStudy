@@ -8,8 +8,22 @@ kubectl get pods
 Удалить pods 
 kubectl delete pod --all
 
-2.1.3 Самостоятельная работа
+2.1.3 Практика
 Запустите в кластере pod из образа busybox:latest c командой sh -c 'while true; do echo New random number is $(( ( RANDOM % 100 )  + 1 )); sleep 2; done'  и именем hello
+
+cd  ~/slurm/practice/2.application-abstractions/1.pod
+kubectl create -f pod.yaml
+vim pod.yaml
+kubectl create -f pod.yaml
+kubectl get pod
+kubectl delete pod --all
+
+2.1.4 Практика
+  846  cp pod.yaml pod-sam.yaml
+  850  kubectl create -f pod-sam.yaml
+  852  kubectl logs hello-pod
+  853  vim pod-sam.yaml
+  856  kubectl delete pod hello-pod
 
 ---
 # file: practice/2.application-abstractions/1.pod/pod-sam.yaml
@@ -26,6 +40,7 @@ spec:
 ...
 
 
+
 Посмотреть логи pod'а:
 kubectl logs hello
 
@@ -34,6 +49,11 @@ kubectl delete pod hello
 
 
 
+
+
+
+
+2.2.1 Replica set 
 
 Replica set — это важная абстракция в Kubernetes, которая позволяет масштабировать поды внутри кластера.
 Replica set фактически является шаблоном, который описывает темплейт для создания подов. В этом шаблоне можно указать количество подов, которые нужно создать.
@@ -96,6 +116,217 @@ kubectl describe replicaset <replicasetName>
 kubectl get pod <podname> -o=jsonpath='{.spec.containers[*].image}{"\n"}'
 Ключ -o jsonpath позволяет получить не весь объект целиком, а только содержимое конкретных полей.
 Он крайне полезен при написании скриптов для автоматизации задач в Kubernetes.
+
+
+2.2.3 Практика
+  860  cd k8s_slurm/slurm_devk8s/practice/2.application-abstractions/2.replicaset
+  863  kubectl apply -f replicaset.yaml
+  865  kubectl scale rs my-replicaset --replicas 3
+  867  kubectl delete pod my-replicaset-rvxpn
+  869  kubectl set image rs my-replicaset nginx=nginx:1.21
+  870  kubectl describe rs my-replicaset
+  872  kubectl describe pod my-replicaset-bj8tl
+  873  kubectl delete pod my-replicaset-bj8tl
+  874  kubectl get pod
+  875  kubectl describe pod my-replicaset-bwsm2
+  876  kubectl get pod my-replicaset-bwsm2 -o=jsonpath='{.spec.containers[*].image}{"\n"}'
+  877  kubectl delete rs --all
+  878  kubectl get rs
+  879  kubectl get pods
+
+
+
+
+
+
+
+2.3.1 Deployment 
+
+Deployment представляет собой уровень абстракции над ReplicaSet и используется для управления обновлениями версий приложений. Основная задача Deployment — создание новых ReplicaSet с обновленными версиями приложения, которые, в свою очередь, создают необходимые поды.
+
+
+Проверим создание Deployment, применив команду:
+kubectl get deployment
+
+Чтобы изменить число реплик, можно отредактировать соответствующий файл Deployment или применить команду:
+kubectl scale
+
+
+Теперь попробуем обновить наш Deployment. Для этого существует несколько способов:
+1 Изменение версии образа в файле с описанием Deployment и его применение через команду kubectl apply
+2 Использование команды kubectl edit deployment my-deployment для редактирования ресурса непосредственно в кластере:
+3 Использование команды kubectl set image deployment my-deployment 'nginx=nginx:1.13'
+
+Стратегия Rolling Update
+Rolling Update — стратегия обновления, поддерживаемая Kubernetes по умолчанию. Она обеспечивает постепенное обновление подов, гарантируя плавный переход между версиями приложения. Суть Rolling Update заключается в том, что старые реплики заменяются новыми поэтапно: сначала часть старых реплик отключается, затем на их месте запускаются новые. Такой процесс не прерывает работу приложения и остается незаметным для пользователей, поскольку всегда есть активные поды, обрабатывающие запросы.
+Процесс управления Rolling Update в Deployment позволяет контролировать, сколько старых реплик удаляется за раз и сколько новых запускается одновременно. Эти параметры могут быть настроены в конфигурации Deployment.
+В описании конфигурации Deployment: (spec) можно задать дополнительные параметры, такие как стратегия обновления (strategy) это позволяет управлять процессом обновления приложения, задавая количество одновременно обновляемых и сохраняемых реплик во время update. В поле strategy у Deployment можно задать два типа стратегий обновления: RollingUpdate и Recreate
+
+Тип RollingUpdate, как уже было рассмотрено ранее, используется по умолчанию и подразумевает постепенное обновление подов: сначала создаются новые поды, а затем старые поды удаляются. Этот метод обновления обеспечивает непрерывность работы приложения, хотя требует дополнительных ресурсов, так как некоторое время новые и старые поды будут работать одновременно.
+
+Внутри стратегии RollingUpdate предусмотрены два важных параметра: maxSurge и MaxUnavailable
+
+MaxSurge определяет, на сколько новых реплик можно увеличить текущее количество подов относительно заданного значения replicas во время обновления. Например, если у нас replicas равно 2, то при MaxSurge: 1 Kubernetes может поднять одну дополнительную реплику во время обновления. В итоге, на время обновления у нас будет три работающих пода — это текущие 2 пода плюс одна дополнительная реплика.
+MaxUnavailable указывает, сколько подов может быть недоступно во время обновления. В нашем случае, если MaxUnavailable: 1, это означает, что как только процесс обновления запустится, Kubernetes может сразу же удалить одну старую реплику, оставив временно только одну рабочую.
+
+Вместо числовых значений, можно указать проценты. Например, можно настроить MaxSurge и MaxUnavailable как 10%
+
+Стратегия Recreate, в свою очередь, предполагает полное удаление всех старых подов перед созданием новых. Это подход, при котором приложение будет временно недоступно (downtime), что делает его менее подходящим для production-сред. Однако такой способ может оказаться полезным в ситуациях, когда недопустима одновременная работа старой и новой версий приложения, например, из-за различий в обработке данных. Он также может быть полезен в dev-средах, где важна экономия ресурсов, поскольку в процессе обновления не требуется дополнительного места для одновременной работы двух наборов подов.
+
+Если необходимо использовать стратегию обновления, но формат заполнения поля strategy неизвестен, Kubernetes предоставляет удобный инструмент для получения информации — команду kubectl explain. Она позволяет выводить описание полей любых объектов в кластере.
+kubectl explain deployment.spec.strategy....
+
+kubectl explain - это man по k8s
+
+INFO
+PODs и ReplicaSet не используются напрямую, они являются больше служебными абстракциями
+Конекретно используется: Deployment, которы включается в себя ReplicaSet, в свою очередь, который включает в себя PODs
+
+kubectl apply лучше использовать всегда (даже вместо kubectl create)
+
+
+2.3.3 Практика
+
+#  887  minikube start --driver=vmware
+  888  history 1 | tail -n 100
+  889  history | tail -n 100
+  890  vim deployment.yaml
+  891  kubectl apply -f deployment.yaml
+  892  kubectl get pods
+  894  kubectl set image deployment my-deployment nginx=nginx:1.21
+  895  kubectl get pod
+  896  kubectl get rs
+  897  kubectl get deployments
+  898  kubectl describe pod my-deployment-59659b5568-55czr
+  899  kubectl get deployment my-deployment -o=jsonpath='{.status.conditions[1].message}{"\n"}'
+  902  kubectl delete deployments.apps my-deployment
+
+
+2.3.4 Практика
+
+cp deployment.yaml deployment-update.yaml
+vim deployment-update.yaml
+
+---
+# file: practice/2.application-abstractions/3.deployment/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+...
+
+kubectl apply -f deployment-update.yaml
+kubectl get pod
+vim deployment-update.yaml
+kubectl apply -f deployment-update.yaml
+kubectl get pod
+kubectl get deployment my-deployment -o custom-columns='NAME:.metadata.name,MAXSURGE:.spec.strategy.rollingUpdate.maxSurge,MAXUNAVAILABLE:.spec.strategy.rollingUpdate.maxUnavailable'
+kubectl delete deployments.apps my-deployment
+
+Это еще одна возможность ключа -o. Она позволяет вывести описание объекта с пользовательским набором полей.
+
+
+
+
+
+2.4.1 Namespaces
+
+Namespace — это базовая абстракция кластера Kubernetes, представляющая собой пространство имен. Основная функция namespace заключается в разделении имен объектов внутри кластера. В пределах одного namespace невозможно создать два объекта одного типа с одинаковым именем. 
+
+
+По умолчанию работа в кластере ведется в namespace Default. 
+
+для указания другого namespace, можно использовать команду: 
+kubectl -n
+при выполнении команд get, create, apply, delete и других и работать с объектами в другом namespace. Таким образом, namespace обеспечивает разделение пространства имен.
+
+
+2.4.3 Практика
+
+kubectl -n kube-system get pod
+kubectl create ns student
+kubectl -n student apply -f deployment.yaml
+kubectl -n student get pod
+
+
+
+
+
+
+
+
+2.5.1 Resources
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
