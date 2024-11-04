@@ -327,11 +327,24 @@ kubectl delete deployment --all
 
 
 
-
-
-
 3.1.1 Переменные окружения
 
+Это первый способ конфигурирования приложения
+
+В рамках деплоймента можно передавать настройки приложению, а именно конфигурировать переменные окружения. Для этого у деплоймента есть конкретная секция, называемая env. В этой секции можно перечислить любое количество переменных окружения и задать им значения, например, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD и так далее.
+Конфигурирование происходит очень просто и понятно. В секции env обязательно должны быть две строки: name и value. В name указывается название переменной окружения, например, DB_HOST. В нашем случае название переменной ‘TEST’.  В value — значение этой переменной, например, IP-адрес или доменное имя. Если имя переменной окружения DB_USER, то в value пишется имя этого пользователя и т.д.
+
+env:
+- name: foo
+  value: bar
+
+
+Практика 3.1.3
+kubectl apply -f deployment-with-env.yaml
+kubectl get pods
+kubectl describe pod my-deployment-77f7c7bcf5-vblld
+kubectl exec -it my-deployment-77f7c7bcf5-vblld -- env
+kubectl delete deployments.apps --all
 
 
 
@@ -339,32 +352,94 @@ kubectl delete deployment --all
 
 
 
+3.2.1 ConfigMAp
+
+Это второй способ конфигурирования приложения
+
+Один configMap можно подключать к различным deployments (например: распространить настройки на другие приложения)
+
+configmap записываются в отдельный *.yaml файл и подключаются в нужный файл приложения (deployment.yaml). Для подключения ConfigMap к приложению используется поле EnvFrom.
+
+Env и ConfigMap можно использовать совместно
+
+
+cat configmap.yaml                      ✔ 
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap-env
+data:
+  dbhost: postgresql
+  DEBUG: "false"
+...
+
+cat deployment-with-env-cm.yaml         ✔ 
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        env:
+        - name: TEST
+          value: foo
+        envFrom:                           #подключаем configMap файл
+        - configMapRef:
+            name: my-configmap-env
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+...
+
+
+kubectl create -f configmap.yaml
+kubectl get cm                 #cm - configmap - onfigmaps
+kubectl describe cm my-configmap-env
+
+kubectl get cm my-configmap-env -o yaml
+
+kubectl get deployments.apps
+
+Если внести изменения в configMap и даже применить их, они в уже работающих deployments не отразятся без рестарта
+
+
+Практика 3.2.3
+
+kubectl create -f configmap.yaml
+kubectl get configmaps
+kubectl describe cm my-configmap-env
+kubectl get cm my-configmap-env -o yaml
+kubectl apply -f deployment-with-env-cm.yaml
+kubectl exec -it my-deployment-7b5b4c5c99-tq97j -- env
+kubectl delete deployments.apps --all
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+3.3.1 Secrets
