@@ -443,3 +443,151 @@ kubectl delete deployments.apps --all
 
 
 3.3.1 Secrets
+
+
+Secret поддерживает несколько типов для разных задач:
+Generic Secret — используется для хранения токенов, паролей и другой конфиденциальной информации.
+Docker-registry Secret — специальный тип для передачи данных авторизации в Docker Registry
+TLS Secret — используется для хранения сертификатов для подключения TLS, например, для установления HTTPS-соединений.
+
+Создание секрета:
+
+1 вариант
+kubectl create secret generic mysecrets --from-literal='foo=bar' --from-literal='dbpasswd=1q2w3e'
+
+Смотрим какие есть секреты:
+kubectl get secrets
+kubectl describe secrets  mySecrets
+kubectl get secrets mysecrets -o yaml
+
+Секреты выводятся закодированными в Base64
+
+
+Для надёжного хранения секретов надо использовать vault
+
+
+Подключение секретов:
+Secret можно подключить двумя способами:
+
+1 Целиком — с использованием секции envFrom, что позволит подключить весь Secret целиком ко всем переменным окружения.
+2 Избирательно — с использованием секции valueFrom, что позволяет передать значение из Secret только для конкретной переменной.
+
+В манифесте 2:
+env:
+- name: myVar
+  valueFrom:
+    secretKeyRef:
+      name: mySecrets
+      key: foo
+
+
+В манифесте 1:
+envFrom:
+  - secretRef:
+      name: intercom-secret
+  - secretRef:
+      name: paypal-secret
+  - secretRef:
+      name: postgres-secret
+  - secretRef:
+      name: redis-secret
+
+
+
+
+2 вариант
+
+secret-base64.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret
+data:
+  username: bXktYXBw
+  password: Mzk1MjgkdmRnN0pi
+
+
+
+secret-plaintext.yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-secret
+stringData:
+  username: paul
+  password: mYSuPeRPass123
+
+
+
+
+
+stringData - plain text format
+data - base64 format
+
+
+
+kubectl apply -f secret.yaml
+
+
+
+
+3.3.1 Практика
+
+kubectl create secret generic mySecrets --from-literal='foo=bar' --from-literal='dbpasswd=1q2w3e'
+kubectl get secrets
+kubectl get secrets -o yaml
+kubectl get secret mysecrets -o yaml
+kubectl apply -f deployment-with-secret.yaml
+kubectl get pod
+kubectl describe pod my-deployment-5bf6449f4-jhws8
+kubectl apply -f secret.yaml
+kubectl get secrets -o yaml
+
+
+
+
+
+
+3.4.1 configMap. Часть 2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
