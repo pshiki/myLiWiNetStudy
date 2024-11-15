@@ -712,6 +712,54 @@ ansible-vault создаёт зашифрованный файл
 
 
 
+How to store and use sudo passwed in a vault (method # 2)
+First update your inventory file as follows:
+
+[cluster:vars]
+k_ver="linux-image-4.13.0-26-generic"
+ansible_user=vivek  # ssh login user
+ansible_become=yes  # use sudo 
+ansible_become_method=sudo 
+ansible_become_pass='{{ my_cluser_sudo_pass }}'
+ 
+[cluster]
+www1
+www2
+www3
+db1
+db2
+cache1
+cache2
+Next create a new encrypted data file named password.yml, run the following command:
+$ ansible-vault create passwd.yml
+
+Set the password for vault. After providing a password, the tool will start whatever editor you have defined with $EDITOR. Append the following
+my_cluser_sudo_pass: your_sudo_password_for_remote_servers
+Save and close the file in vi/vim. Finally run playbook as follows:
+$ ansible-playbook -i inventory --ask-vault-pass --extra-vars '@passwd.yml' my.yml
+
+How to edit my encrypted file again
+ansible-vault edit passwd.yml
+
+How to change password for my encrypted file
+ansible-vault rekey passwd.yml
+
+
+This example shows how you can include variables defined in an external file:
+
+---
+
+- hosts: all
+  remote_user: root
+  vars:
+    favcolor: blue
+  vars_files:
+    - /vars/external_vars.yml
+
+  tasks:
+
+  - name: This is just a placeholder
+    ansible.builtin.command: /bin/echo foo
 
 
 
@@ -721,11 +769,50 @@ ansible-vault создаёт зашифрованный файл
 
 
 
+Перезапустить сервис, если изменился конфиг
 
+There are two solutions.
 
+Register + When changed
+You can register template module output (with its status change),
 
+register: service_conf
+and then use when clause.
 
+when: service_conf.changed
+For example:
 
+---
+- name: Systemd service
+  template:
+    src: sonar.unit.j2
+    dest: /etc/systemd/system/sonarqube.service
+  when: "ansible_service_mgr == 'systemd'" 
+  register: service_conf
+
+- name: restart service
+  service:
+    name: sonarqube
+    state: restarted
+  when: service_conf.changed
+Handler + Notify
+You define your restart service task as handler. And then in your template task you notify the handler.
+
+tasks:
+  - name: Add Sonarqube to Systemd service
+    template:
+      src: sonar.unit.j2
+      dest: /etc/systemd/system/sonarqube.service
+    when: "ansible_service_mgr == 'systemd'"
+    notify: Restart Sonarqube
+  - …
+
+handlers:
+  - name: Restart Sonarqube
+    service:
+      name: sonarqube
+      state: restarted
+More info can be found in Ansible Doc.
 
 
 

@@ -1,0 +1,30 @@
+---
+
+- hosts: proxy_servers
+  become: yes
+  vars:
+    nginx_serverhostname_1: 'deb12-02-nginx01'
+    nginx_serverhostname_2: 'deb12-03-nginx02'
+    nginx_serverip_1: '192.168.122.5'
+    nginx_serverip_2: '192.168.122.6'
+  vars_files:
+    - vault.yml
+
+  tasks:
+    - name: install haproxy
+      apt: 
+        name: haproxy
+        state: present
+
+    - name: configure haproxy
+      template: 
+        src: templates/haproxy.cfg.j2
+        dest: /etc/haproxy/haproxy.cfg
+      notify: restart service haproxy
+
+
+  handlers:
+    - name: restart service haproxy
+      service:
+        name: haproxy
+        state: restarted

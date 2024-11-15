@@ -1,0 +1,49 @@
+---
+
+- hosts: web_servers
+  vars_files:
+    - vault.yml
+
+  tasks:
+    - name: install docker
+      apt: 
+        name: docker.io
+        state: present
+      register: docker_installed
+      become: yes
+
+    - name: check docker working
+      command: "/usr/bin/docker run hello-world"
+      when: docker_installed.changed
+      
+    - name: create site directory
+      file:
+        path: /tmp/www
+        state: directory
+        mode: '0755'
+       
+#    - name: create nginx conf directory
+#      file:
+#        path: /tmp/nginx
+#        state: directory
+#        mode: '0755'
+
+    - name: copy html page
+      template:
+        src: templates/index.html.j2
+        dest: /tmp/www/index.html
+      register: index_page
+
+#    - name: copy nginx config
+#      template:
+#        src: templates/nginx.conf.j2
+#        dest: /tmp/nginx/nginx.conf
+
+    - name: stop docker containeers used 80 port
+      script: "files/web_server_stop.sh"
+      become: yes
+      when: index_page.changed
+
+    - name: running nginx in container
+      command: "/usr/bin/docker run -d --restart always -p 80:80 -v /tmp/www:/usr/share/nginx/html nginx:stable"
+#               -v /tmp/nginx:/etc/nginx

@@ -1,0 +1,17 @@
+proxy_servers:
+  hosts:
+    deb12-01-haproxy:
+      ansible_host: 192.168.122.2
+      ansible_user: pavel
+      ansible_become_pass: '{{ serverPassword }}'
+
+web_servers:
+  hosts:
+    deb12-02-nginx01:
+      ansible_host: 192.168.122.5
+      ansible_user: pavel
+      ansible_become_pass: '{{ serverPassword }}'
+    deb12-03-nginx02:
+      ansible_host: 192.168.122.6
+      ansible_user: pavel
+      ansible_become_pass: '{{ serverPassword }}'

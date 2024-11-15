@@ -1,3 +1,7 @@
+Дописать в файл:
+cat ~/.ssh/id_rsa.pub | ssh root@ip-адрес-сервера 'cat >> ~/.ssh/authorized_keys'
+
+
 Работа с пользователями:
 Создать системного пользователя
 useradd -M -r -s /bin/false _userName_

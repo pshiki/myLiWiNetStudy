@@ -1,0 +1,61 @@
+---
+
+# Host to execute this playbook
+- hosts: web_servers
+  # Become root user
+  become: true
+  vars:
+    # Apache listen on Port 8080
+    http_port: 8080
+    admin: ansible-devops
+    # DocumentRoot set to content_dir var
+    # New DocumentRoot is webcontent
+    content_dir: /webcontent
+  tasks:
+    - name: Create Group for Webcontent
+      group:
+        name: webcontent
+        state: present
+    - name: Create Webcontent Dir
+      file:
+        path: /webcontent
+        state: directory
+        group: webcontent
+        owner: ansible-devops
+        mode: '2775'
+    - name: set mode to enforcing
+      selinux:
+        policy: targeted
+        state: enforcing
+    - name: enable httpd cgi boolean
+      seboolean:
+        name: httpd_enable_cgi
+        state: true
+        persistent: true
+    - name: Set SELinux Context on Directory
+      sefcontext:
+        target: "/webcontent(/.*)?"
+        setype: httpd_sys_content_t
+        state: present
+    - name: run restorecon
+      command: restorecon -irv /webcontent
+    # Push httpd Config Template
+    - name: push config template
+      template:
+        src: /home/vcirrus-consulting/RHCE-Ansible/templates/httpd.conf.j2
+        dest: /etc/httpd/conf/httpd.conf
+        backup: true
+        # Notify handler to Restart Apache
+        notify: "restart apache"
+    # Push index Config Template
+    - name: push index.html template
+      template:
+        src: /home/vcirrus-consulting/RHCE-Ansible/templates/index.html.j2
+        dest: /webcontent/index.html
+        # Notify this hander, and Roll Out New Changed in Config File
+      handlers:
+        - name: restart web servers
+          service:
+            name: httpd
+            state: restarted
+            listen: "restart apache"
