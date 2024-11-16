@@ -1,9 +1,17 @@
 proxy_servers:
   hosts:
-    deb12-01-haproxy:
+    deb12-00-ha01:
       ansible_host: 192.168.122.2
       ansible_user: pavel
       ansible_become_pass: '{{ serverPassword }}'
+      SERVER_ROLE_KEEPALIVED: MASTER
+      SERVER_PRIORITY: 100
+    deb12-01-ha02:
+      ansible_host: 192.168.122.3
+      ansible_user: pavel
+      ansible_become_pass: '{{ serverPassword }}'
+      SERVER_ROLE_KEEPALIVED: BACKUP
+      SERVER_PRIORITY: 99
 
 web_servers:
   hosts:

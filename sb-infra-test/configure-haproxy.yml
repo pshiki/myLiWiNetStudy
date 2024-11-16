@@ -7,6 +7,7 @@
     nginx_serverhostname_2: 'deb12-03-nginx02'
     nginx_serverip_1: '192.168.122.5'
     nginx_serverip_2: '192.168.122.6'
+    keepalived_virtual_ip: '192.168.122.10'
   vars_files:
     - vault.yml
 
@@ -22,9 +23,40 @@
         dest: /etc/haproxy/haproxy.cfg
       notify: restart service haproxy
 
+    - name: install keepalived
+      apt: 
+        name: keepalived
+        state: present
+
+    - name: create user keepalived_script
+      user:
+        name: keepalived_script
+        shell: /usr/bin/nologin
+
+    - name: change sys prefs for keepalived
+      lineinfile: 
+        path: /etc/sysctl.conf
+        line: net.ipv4.ip_nonlocal_bind=1
+      become: yes
+      register: sys_prefs
+
+    - name: appy sys prefs changes for keepalived
+      command: "sysctl -p"
+      when: sys_prefs.changed
+
+    - name: configure keepalived
+      template: 
+        src: templates/keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+      notify: restart service keepalived
 
   handlers:
     - name: restart service haproxy
       service:
         name: haproxy
+        state: restarted
+
+    - name: restart service keepalived
+      service:
+        name: keepalived
         state: restarted

@@ -1,0 +1,29 @@
+global_defs {
+   router_id {{ ansible_hostname }}
+}
+
+vrrp_script check_haproxy {
+  script "/usr/bin/systemctl is-active --quiet haproxy"
+  interval 2
+  weight 2
+}
+
+vrrp_instance VI_1 {
+    state {{ SERVER_ROLE_KEEPALIVED }}
+    interface {{ ansible_default_ipv4['interface'] }}
+    virtual_router_id 51
+    priority {{ SERVER_PRIORITY }}
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass {{ KAD_PASS }}
+    }
+
+    virtual_ipaddress {
+        {{ keepalived_virtual_ip }}
+    }
+        
+    track_script {
+    check_haproxy
+  }
+}

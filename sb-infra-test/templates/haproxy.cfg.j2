@@ -42,7 +42,7 @@ defaults
 ###START_MY_CONFIG###
 
 frontend http_front
-        bind *:80
+        bind {{ keepalived_virtual_ip }}:80
         default_backend http_back
 
 backend http_back
