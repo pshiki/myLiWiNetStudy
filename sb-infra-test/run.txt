@@ -1,0 +1,2 @@
+ansible-playbook -l proxy_servers -i inventory/myinventory.yml configure-haproxy.yml --ask-vault-pass -b -v
+ansible-playbook -l all -i inventory/myinventory.yml configure_web_server.yml --ask-vault-pass -b -v
