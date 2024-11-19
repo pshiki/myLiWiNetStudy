@@ -552,9 +552,209 @@ kubectl get secrets -o yaml
 
 3.4.1 configMap. Часть 2
 
+Актуально для Legacy приложений, которые не воспринимают переменными, например: конфигурация требуется отдельным форматом, отличном от YAML, JSON или ключ-значение
+
+Пример такого configMap:
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  default.conf: |
+    server {
+        listen       80 default_server;
+        server_name  _;
+
+        default_type text/plain;
+
+        location / {
+            return 200 '$hostname\n';
+        }
+    }
+...
+
+
+Пример подключения такого configMap
+
+cat deployment-with-configmap.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+      volumes:
+      - name: config
+        configMap:
+          name: my-configmap
+...
+
+
+Секция Volumes предназначена для подключения различных томов (volumes) к приложению (deployment)
+Секция Volumes находится на уровне spec (спецификации) всего деплоймента, а не внутри контейнеров. Это связано с тем, что один и тот же деплоймент может использовать несколько томов и контейнеров одновременно. В итоге, можно подключать разные типы томов к различным контейнерам, а также использовать один и тот же том в нескольких контейнерах. Поэтому тома конфигурируются отдельно в секции Volumes, где описываются все используемые тома, их типы и названия.
+
+VolumeMounts — это секция, которая непосредственно связывает тома из секции Volumes с конкретными контейнерами. В этой секции указывается, какой именно том используется и куда он будет монтирован внутри контейнера.
+
+Volumes - что монтируем
+VolumeMounts - кому и куда монтируем
+
+может быть использован не только ConfigMap, но и другие типы томов, включая Secrets
+
+файл default.conf — это символическая ссылка, которая указывает на другой файл, data-default.conf. При этом ..data — это символическая ссылка, ведущая к директории с таймстемпом, поэтому подключенные данные через Volume, можно изменять на лету (без перезагрузки POD), однако некоторые приложения требую рестарт, что бы применить изменённые напирмер конфиги. Изменения происходят за счет симлинков
+
+Проброс порта
+kubectl port-forward my-deployment-543fgfdgdf-fsd43d 8080:80 &
+curl localhost:8080
+Это нужно если необходимо получить данные из контейнера (curl), который находится не в одной сети с кластером
+Отключить: fg bg или kill -9 $(ps -ef | grep 'port-forward' | awk '{print $2}')
 
 
 
+3.4.3 Практика
+
+kubectl apply -f configmap.yaml
+kubectl apply -f deployment-with-configmap.yaml
+kubectl get pods  -o wide
+curl 10.224.0.34
+kubectl describe cm my-configmap
+kubectl describe pod my-deployment-678fc95fc8-hfdd5
+kubectl exec -it my-deployment-678fc95fc8-hfdd5 -- bash
+kubectl port-forward my-deployment-678fc95fc8-hfdd5 8080:80 &
+curl localhost:8080
+
+
+3.4.6 Практика
+
+vim configmap.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  default.conf: |
+    server {
+        listen       80 default_server;
+        server_name  _;
+
+        default_type text/plain;
+
+        location / {
+            return 200 '$hostname\nOK\n';
+        }
+    }
+...
+
+curl localhost:8080
+kubectl exec -it my-deployment-678fc95fc8-hfdd5 -- bash
+cat /etc/nginx/conf.d/default.conf
+
+
+
+3.4.7 Практика (херня полная, вообще непонятно)
+
+kubectl apply -f php-config.yaml
+kubectl apply -f deployment-with-configmap-php.yaml
+kubectl get pods
+cat php-config.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-php-conf
+data:
+  php.ini: |
+    [php]
+    register_globals = off
+    track_errors = yes
+...
+
+cat deployment-with-configmap-php.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: quay.io/testing-farm/nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+        - name: php
+          mountPath: /etc/php.ini
+          subPath: php.ini
+      volumes:
+      - name: config
+        configMap:
+          name: my-configmap
+      - name: php
+        configMap:
+          name: my-php-conf
+...
+kubectl exec -it my-deployment-798c5bd979-ks68h -- bash
+ls -lsa /etc          # тут типо что-то не так
+kubectl edit deployments my-deployment   # типо чиним Убираем subPath, меняем точку монтирования.   
+  - mountPath: /etc
+    name: php
+
+kubectl get pod   #под не поднимается 
+kubectl describe pod my-deployment-6f74684dd-wd46w
+kubectl delete deployments my-deployment
 
 
 
