@@ -761,26 +761,201 @@ kubectl delete deployments my-deployment
 
 
 
+3.5.1 Downward API
+
+Этот метод не столько предназначен для внесения пользовательских конфигураций, сколько для передачи параметров окружения, в котором работает приложение, включая параметры, касающиеся самого Kubernetes. С помощью Downward API можно передать внутрь контейнера определённые параметры манифеста Kubernetes в виде переменных окружения или файлов.
+
+Для получения какого-либо значения из манифеста, например, имя ноды или другого параметра из Kubernetes, используем следующую конструкцию:
+
+- name: __NODE_NAME
+
+valueFrom: показывает, что значение для переменной мы не задаём вручную, а берём из другого источника.
+fieldRef: позволяет сослаться на конкретное поле манифеста.
+fieldPath: указывает конкретное место в манифесте в формате YAML, откуда будет взято значение. Это значение берется непосредственно из манифеста.
 
 
+Если требуется получить данные из более глубоких уровней манифеста, можно использовать точечную нотацию YAML, например, spec.resources.limits, чтобы получить лимиты ресурсов.
+
+Также можно передать в контейнер информацию о сервис-аккаунте, под которым работает под. 
+Данный Volume имеет тип downwardAPI
+В секции items указываем, какие именно данные будут переданы через этот Volume - 'labels’, содержащий все лейблы манифеста, и 'annotations', в который записываются все аннотации манифеста.
+В файле labels все метки, ассоциированные с данным манифестом.
+В файле annotations записаны все аннотации, относящиеся к этому поду
+Аннотации представляют собой дополнительные метки, используемые для реализации определённого функционала в Kubernetes, используются в Ingress
+
+cat deployment-with-downward-api.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        env:
+        - name: TEST
+          value: foo
+        - name: __NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: __POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: __POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: __POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: __NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: __POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+        - name: podinfo
+          mountPath: /etc/podinfo
+      volumes:
+      - name: config
+        configMap:
+          name: my-configmap
+      - name: podinfo
+        downwardAPI:
+          items:
+            - path: "labels"
+              fieldRef:
+                fieldPath: metadata.labels
+            - path: "annotations"
+              fieldRef:
+                fieldPath: metadata.annotations
+...
+
+https://kubernetes.io/docs/tasks/inject-data-application/downward-api-volume-expose-pod-information/
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubernetes-downwardapi-volume-example
+  labels:
+    zone: us-est-coast
+    cluster: test-cluster1
+    rack: rack-22
+  annotations:
+    build: two
+    builder: john-doe
+spec:
+  containers:
+    - name: client-container
+      image: registry.k8s.io/busybox
+      command: ["sh", "-c"]
+      args:
+      - while true; do
+          if [[ -e /etc/podinfo/labels ]]; then
+            echo -en '\n\n'; cat /etc/podinfo/labels; fi;
+          if [[ -e /etc/podinfo/annotations ]]; then
+            echo -en '\n\n'; cat /etc/podinfo/annotations; fi;
+          sleep 5;
+        done;
+      volumeMounts:
+        - name: podinfo
+          mountPath: /etc/podinfo
+  volumes:
+    - name: podinfo
+      downwardAPI:
+        items:
+          - path: "labels"
+            fieldRef:
+              fieldPath: metadata.labels
+          - path: "annotations"
+            fieldRef:
+              fieldPath: metadata.annotations
 
 
+https://kubernetes.io/docs/tasks/inject-data-application/environment-variable-expose-pod-information/
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dapi-envars-fieldref
+spec:
+  containers:
+    - name: test-container
+      image: registry.k8s.io/busybox
+      command: [ "sh", "-c"]
+      args:
+      - while true; do
+          echo -en '\n';
+          printenv MY_NODE_NAME MY_POD_NAME MY_POD_NAMESPACE;
+          printenv MY_POD_IP MY_POD_SERVICE_ACCOUNT;
+          sleep 10;
+        done;
+      env:
+        - name: MY_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: MY_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: MY_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MY_POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: MY_POD_SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+  restartPolicy: Never
 
 
+3.5.3 Практика
 
+kubectl apply -f deployment-with-downward-api.yaml
+kubectl exec -it my-deployment-8f7dd6848-kktb6 -- env
 
+kubectl exec -it my-deployment-8f7dd6848-kktb6 -- cat /etc/podinfo/labels
+kubectl exec -it my-deployment-8f7dd6848-kktb6 -- cat /etc/podinfo/annotations
 
-
-
-
-
-
-
-
-
-
-
-
+kubectl delete deployment my-deployment
+kubectl delete configmap my-configmap-env
+kubectl delete configmap my-configmap
+kubectl delete secret mysecrets
 
 
 
