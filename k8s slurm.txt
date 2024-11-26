@@ -964,5 +964,175 @@ kubectl delete secret mysecrets
 
 
 
+4.1.1 Хранение данные
+
+k8s не для хранения данных. Данные надо хранить в базе данных (отдельные машины). Файлы надо хранить в S3.
+
+пока мы знаем только два типа volumes: confgMap и secret
+
+
+
+4.2.1 HotsPath
+
+Это обычное монтирование директории или диска на сервере в контейнер
+НО! это опасно!!! При использовании hotsPath пользователь может замонтировать какую угодно директории, например /etc/kubernetes
+в котором находятся сертификаты и админские токены...
+ДАнный тип нужен для корректного функционирования самого k8s кластера
+
+На PROD это использовать нельзя!
+
+ограничения возможны через Pod Security Admission Controller или Open Policy Agent Gatekeeper, которые позволяют контролировать и ограничивать применение HostPath, оставляя его только для необходимых системных компонентов.
+
+Пример hotsPath
+
+
+        volumeMounts:
+        - name: data
+          mountPath: /files
+      volumes:
+      - name: data
+        hostPath:
+          path: /data_pod
+
+Каталог с хостовой машины (node (worker) на котором будет запущен Pod) /data_pod будет примонтирован внутри контейнера.
+Точка монтирования указана в разделе VolumeMount. Здесь мы указываем, что Volume с именем data следует монтировать в каталог /files внутри контейнера
+
+
+4.2.3 Практика
+
+cat deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: data
+          mountPath: /files
+      volumes:
+      - name: data
+        hostPath:
+          path: /data_pod
+...
+
+
+
+cd ~/slurm/practice/4.saving-data/1.hostpath/
+kubectl apply -f deployment.yaml
+
+kubectl get pod
+kubectl get all
+kubectl describe rs my-deployment-6468989d7d
+
+
+kubectl delete deployment my-deployment
+
+
+
+
+
+
+
+
+4.3.1 EmptyDir
+
+В отличии от HostPath, данный тип Volume является более безопасным и чаще применяется в различных сценариях, не вызывая серьезных вопросов, связанных с безопасностью. Volume EmptyDir со всеми данными существует только в течение жизненного цикла пода. Данный тип volume отлично подходит для тестов
+
+Пример:
+
+        volumeMounts:
+        - name: data
+          mountPath: /files
+      volumes:
+      - name: data
+        emptyDir: {}
+
+
+
+4.3.3 Практика
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: data
+          mountPath: /files
+      volumes:
+      - name: data
+        emptyDir: {}
+...
+
+
+kubectl apply -f deployment.yaml
+kubectl exec -it my-deployment-7db8d46cf-bd75c -- sh -c 'echo "Some data" > /files/data.txt'
+kubectl exec -it my-deployment-7db8d46cf-bd75c -- cat /files/data.txt
+kubectl delete pod my-deployment-7db8d46cf-bd75c
+kubectl exec -it my-deployment-7db8d46cf-bd75c -- sh -c 'cat /files/data.txt'
+kubectl delete deployments.apps my-deployment
+
+
+
+
+
+
+
+
+
 
 
