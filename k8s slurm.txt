@@ -1135,4 +1135,288 @@ kubectl delete deployments.apps my-deployment
 
 
 
+4.4.1 PV\PVC
+
+PersistentVolumeClaim (PVC) - В рамках Persistent Volume Claim мы описываем требования и пожелания к тому, какой диск или хранилище, волюм нужно подключить к приложению. Например, здесь можно указать:
+    Размер: Желаемый объем того Volume, который должен быть доступен в контейнере.
+    Тип хранилища: Если в кластере имеется несколько хранилищ, можно выбрать конкретное (Ceph или NFS и т.д.).
+    Метод доступа: Способ взаимодействия с подключаемым диском или Volume.
+Persistent Volume Claim — это объект, в котором определяются параметры и пожелания к подключаемому диску или Volume
+создается отдельно или заранее.
+
+
+Persistent Volume (PV) - это описание параметров и статуса тома, используемого в кластере
+
+Storage Class - хранит настройки подключения к хранилищу
+предоставляет информацию о том, где находится NFS-сервер, какие логины и пароли использовать, как подключаться, и так далее
+Это уже уровень ПРОДа
+
+
+Можно вручную создавать PVs - Pool of PVs, или использовать PV Provisioners - это автоматическое получение томов в k8s ровно необходимого места с СХД
+Provisioner следит за запросами PVC. Когда возникает новый запрос, Provisioner автоматически обращается к СХД, создает необходимые тома и подключает их к k8s, формируя PV. Кроме того, Provisioner создаёт тома в точном соответствии с размером, указанным в PVC
+
+
+Пример создания Storage Class и Volume без использования автоматизации через Provisioner
+initContainers — контейнер, который запускается до основных контейнеров и выполняет предварительную настройку
+
+PVC info
+Существует два основных типа доступа к Volume:
+1. ReadWriteMany — позволяет множественное чтение и запись
+2. ReadWriteOnce — ограничивает доступ только для одного источника (поды одной ноды)
+
+
+SС info
+в качестве Provisioner указан NoProvisioner - означаент встроенный, ручное создание PV
+Storage Class требует ручного вмешательства, так как он действует по принципу volumeBlindingMode: waitForFirstConsumer
+
+
+PV info
+Volume Mode — File System
+Access Mode:
+ - ReadWriteOnce
+
+Опция Local указавает, что этот Volume будет использоваться как локальная папка
+путь к этой папке через localPath, через объект nodeAffinity и nodeSelector задаем конкретную ноду, на которой будет создан данный Volume
+
+***
+Спецификация Storage Class - тут остановился
+***
+
+В разделе Data Source укажем StorageClassName (для точной привязки PVC к конкретному Storage Class и, соответственно, к определенному SHD в PVC рекомендуется явно указывать спецификацию Storage Class)
+
+В отличие от hostPath каталоги автоматически не создаются на хостовой ноде, поэтому их необходимо создавать вручную
+
+
+PV статус 'Bound' означает успешное монтирование
+
+
+
+Автоматизация создания PV через NFS
+Помимо ручной конфигурации в StorageClass с параметром NoProvisioner, как мы уже рассмотрели, можно настроить автоматическое создание PV через подключение к сетевому хранилищу, например, NFS. В этом случае, когда создается PVC, Provisioner автоматически запрашивает необходимое пространство в хранилище, создаёт PV и монтирует его в кластер. Таким образом, ручные действия не требуются
+
+
+
+
+
+Пример ручной нарезки дисков
+
+cat pvc.yaml
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: fileshare
+spec:
+  storageClassName: local-storage
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+
+cat deployment.yaml
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fileshare
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fileshare
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: fileshare
+    spec:
+      initContainers:
+      - image: busybox
+        name: mount-permissions-fix
+        command: ["sh", "-c", "chmod 777 /data"]
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      containers:
+      - image: centosadmin/reloadable-nginx:1.12
+        name: nginx
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: config
+        configMap:
+          name: fileshare
+      - name: data
+        persistentVolumeClaim:
+          claimName: fileshare
+
+
+cat configmap.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fileshare
+data:
+  default.conf: |
+    server {
+      listen       80 default_server;
+      server_name  _;
+
+      default_type text/plain;
+
+      location / {
+        return 200 '$hostname\n';
+      }
+
+      location /files {
+        alias /data;
+        autoindex on;
+        client_body_temp_path /tmp;
+        dav_methods PUT DELETE MKCOL COPY MOVE;
+        create_full_put_path on;
+        dav_access user:rw group:rw all:r;
+      }
+    }
+
+cat sc.yaml
+---
+kind: StorageClass  #ручное создание
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+
+cat pv.yaml
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: node1-pv1
+spec:
+  capacity:
+    storeage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /local/pv1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - node1.s0001.slurm.io
+
+
+
+kubectl get pvc
+kubectl get pv
+kubectl get sc
+
+kubectl create -f sc.yaml
+kubectl create -f pv.yaml
+
+ssh root@node1.s0001.slurm.io
+mkdir -p /local/pv1
+
+
+
+
+4.4.3 Практика
+
+kubectl apply -f pvc.yaml
+kubectl get pvc
+kubectl get pv
+kubectl apply -f .
+kubectl describe pod fileshare-9989bfb55-f6q6v
+kubectl exec -it fileshare-9989bfb55-f6q6v -- df -h
+kubectl delete -f .
+
+
+
+
+
+
+4.5.1 Init Container
+В секции initContainers можно задать контейнеры, которые будут выполняться перед основными контейнерами, описанными в секции containers. Например, в containers может запускаться наш Nginx, а перед этим, в init-контейнерах, могут выполняться другие задачи. Например, они могут установить необходимые права на каталог, если приложение должно работать от непривилегированного пользователя, или как пример копирование конфигурационных файлов, установка прав или создание каталогов.
+Init-контейнеры выполняются последовательно в том порядке, в котором они описаны в манифесте.
+init-контейнеры завершают свою работу перед тем, как будут запущены основные контейнеры.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
