@@ -1371,6 +1371,535 @@ init-контейнеры завершают свою работу перед т
 
 
 
+5.1.1 Health Check
+
+
+Probes
+• Liveness Probe
+Контроль за состоянием приложения во время его жизни
+Исполняется постоянно
+• Readiness Probe
+Проверяет, готово ли приложение принимать трафик
+В случае неудачного выполнения, приложение убирается из балансировки
+Исполняется постоянно
+• Startup Probe
+Проверяет, запустилось ли приложение
+Исполняется при старте
+
+
+Liveness Probe
+Liveness проба предназначена для контроля жизнеспособности приложения. Она периодически проверяет, действительно ли приложение работает корректно. Например, каждые 10 секунд эта проба выполняет проверку состояния приложения. Если оно перестало отвечать или функционировать, liveness проба инициирует перезапуск контейнера, что позволяет избежать длительных простоев и зависаний.
+Если liveness проба проваливается, это свидетельствует о том, что приложение перестало корректно функционировать. В таком случае Kubernetes перезапускает данный инстанс приложения. Таким образом, liveness проба обеспечивает поддержание работоспособности путем перезапуска зависших или некорректно работающих контейнеров.
+
+Readiness Probe
+В отличие от liveness пробы, readiness проба проверяет готовность приложения принимать трафик. Это могут быть две разные проверки, хотя чаще всего это одна проверка, которая прописывается в разных секциях манифеста. Readiness проба также исполняется постоянно с какой-то периодичностью, раз в 10 секунд, например, когда Kubernetes проверяет, готово ли приложение принимать трафик. Если эта проба неудачна, приложение исключается из балансировки, и трафик на эту реплику перестает поступать. Это гарантирует, что пользователи взаимодействуют только с полностью готовыми и работоспособными экземплярами приложения.
+
+Startup Probe
+Startup проба проверяет, успешно ли приложение запустилось. Эта проба выполняется единожды, в момент старта контейнера после применения деплоймента и успешного запуска приложения.
+Startup проба выполняет определённый холстчек, и если он успешно проходит, можно считать, что приложение готово принимать трафик и другие проверки. Важно отметить, что остальные пробы, такие как liveness проба и readiness проба, начинают выполняться только после успешного завершения Startup пробы.
+В Kubernetes startup проба была внедрена для работы с приложениями, которые имеют длительное время запуска, например, устаревшие системы или Java-приложения.
+
+
+В Kubernetes предусмотрены три вида проверок:
+
+1.     HTTP GET — в этом случае проверка осуществляется с помощью HTTP-запроса. Мы отправляем запрос на заданный путь (path) и порт (port), чтобы проверить, готово ли приложение принимать трафик:
+если приложение отвечает кодом 200 на запрос по указанному пути и порту (например, на порт 80), это означает, что оно готово к работе. В случае с Nginx, сервер на порту 80 вернет страницу с приветствием Welcome to Nginx, что подтверждается кодом 200. Стоит отметить, что успешными HTTP-кодами считаются коды в диапазоне от 200 до 399. Например, коды 301 или 302 также считаются успешными, в то время как код 404 указывает на ошибку, и такая проверка будет считаться неудачной.
+2.     Exec — этот вид проверки позволяет выполнять команду непосредственно внутри контейнера. Kubernetes заходит внутрь контейнера и исполняет указанную команду. Например, можно выполнить команду SELECT 1 в базе данных, чтобы убедиться, что база данных работает корректно.
+3.     TCP-сокет — этот вид проверки просто проверяет доступность указанного сокета. Если сокет доступен, то проверка считается успешной. Это самый простой и базовый тип проверки.
+
+На практике чаще всего используются проверки типа HTTP GET
+
+
+
+5.1.3 Практика
+
+cat deployment-with-stuff.yaml
+---
+# file: practice/5.network-abstractions/1.probes/deployment-with-stuff.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+          initialDelaySeconds: 10
+        startupProbe:
+          httpGet:
+            path: /
+            port: 80
+          failureThreshold: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 50m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+...
+
+
+
+kubectl apply -f deployment-with-stuff.yaml
+kubectl get pod
+kubectl describe pod my-deployment-7dcd76b7bb-5qnpt
+vim deployment-with-stuff.yaml
+kubectl apply -f deployment-with-stuff.yaml
+kubectl get pod
+kubectl describe pod my-deployment-6d599694c5-4jkjf
+kubectl delete deployment --all
+
+
+
+
+
+
+
+5.2.1  Способы публикации приложения в Kubernetes
+
+
+Основные методы включают использование абстракций Service и Ingress. Эти абстракции предоставляют различные подходы для обеспечения доступа к приложению.
+Service представляет собой одну из ключевых абстракций в Kubernetes, обеспечивающую сетевое взаимодействие между подами и внешним миром.
+
+Service в Kubernetes не является прокси-сервером, это просто набор правил IPTables или IPVS, которые обеспечивают маршрутизацию и балансировку трафика между подами в кластере.
+
+Существует несколько типов сервисов:
+
+    ClusterIP
+    NodePort
+    LoadBalancer
+    ExternalName
+    ExternalIPs
+
+
+ClusterIP 
+Это тип сервиса, предназначенный для внутреннего сетевого взаимодействия в пределах кластера.
+
+selector указывает, какие поды будут обслуживаться этим сервисом.
+type указывает, что сервис является ClusterIP.
+ports указывает порты, которые будут использоваться для связи.
+ClusterIP сервис предназначен преимущественно для внутреннего использования и обеспечивает связь между различными компонентами приложения внутри кластера.
+абстракция Service позволяет обращаться к приложению через DNS-имя, создаваемое на основе имени сервиса.
+При создании объекта типа Service автоматически генерируется DNS-запись
+
+Использование Cluster IP для предоставления внешнего доступа к приложению
+kubectl port-forward service/myService 10000:80
+пробрасывает локальный порт 10000 к порту 80 сервиса myService в кластере.
+
+
+NodePort
+используется для публикации приложений. При применении манифеста для NodePort на каждой ноде кластера (включая рабочие ноды и управляющие компоненты) открывается определённый порт. Этот порт назначается из диапазона 30000–32767. Например, если открыт порт 30000, он будет доступен на всех нодах кластера, и внешние запросы, направленные на этот порт, будут перенаправляться в приложение
+
+Такой подход позволяет открывать порты на уровне нод, что может быть полезно для публикации TCP-сервисов или других нестандартных портов, не связанных с HTTP-трафиком. 
+
+Необходимо указывать порт в URL (например, example.com:30000)
+
+
+
+LoadBalancer
+Этот тип сервиса предназначен исключительно для использования в облачных средах
+Он требует наличия облачного контроллера, который управляет созданием внешнего балансировщика нагрузки в зависимости от настроек сервиса
+При использовании сервиса LoadBalancer создаётся внешний балансировщик нагрузки, который распределяет входящий трафик между подами внутри кластера. Этот балансировщик автоматически настраивается в облачной инфраструктуре и обеспечивает доступ к приложению как для HTTP, так и для TCP трафика.
+
+
+
+ExternalName
+в случае с ExternalName трафик направляется от подов к сервису
+При применении такого манифеста создается DNS-запись с именем сервиса. Эта DNS-запись указывает не на поды, а на значение, указанное в поле externalName. В результате при обращении к my-service происходит разрешение DNS на указанный внешний адрес, например, example.com
+Применение ExternalName позволяет осуществлять доступ к внешним ресурсам через DNS-записи внутри кластера.
+
+
+
+Сервис External IPs
+При использовании External IPs создаются правила трансляции, направляющие трафик, поступающий на определенный IP-адрес, в соответствующие поды, то есть в приложение. На каждой ноде кластера устанавливаются сетевые правила, которые перенаправляют трафик, поступающий на указанный IP-адрес, в приложение, например, на 80-й порт.
+
+Сетевые правила создаются на всех нодах кластера, независимо от наличия указанного IP-адреса на конкретной ноде. Обратите внимание на то, что манифест практически точно такой же, как и все предыдущие, за исключением одного нового поля – externalIPs. На этот IP-адрес будет приходить трафик, и с него он будет отправляться в приложение. Администратор должен обеспечить корректное направление трафика на нужную ноду и IP-адрес для доступа к соответствующему приложению.
+
+
+
+
+Headless
+Принцип работы данного сервиса заключается в следующем: манифест этого сервиса практически идентичен другим сервисам, за исключением того, что поле ClusterIP установлено в значение none. Это приводит к тому, что при создании сервиса автоматически генерируется DNS-запись с именем.  В этой DNS-записи будут возвращаться все IP-адреса всех подов, относящихся к данному сервису. Таким образом, при запросе типа nsvcap.my-service будут предоставлены IP-адреса всех подов, связанных с этим сервисом.
+Если запрос будет направлен к конкретному поду через его имя, например, my-service.имя_пода, будет возвращен конкретный IP-адрес данного пода. Этот тип сервиса находит свое основное применение в базах данных, где необходимо организовать репликацию. В таких сценариях с помощью сервиса можно направлять трафик на запись в один под (например, мастер) и на чтение в другой под (например, реплику), используя возможности DNS-направления.
+
+
+kubectl get svc
+
+
+
+cat clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-app
+  type: ClusterIP
+
+
+
+cat nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service-np
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-app
+  type: NodePort
+
+
+
+
+
+5.2.8 Практика
+
+cat app/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-configmap
+data:
+  default.conf: |
+    server {
+        listen       80 default_server;
+        server_name  _;
+        default_type text/plain;
+
+        location / {
+            return 200 '$hostname\n';
+        }
+    }
+
+
+cat app/deployment-with-configmap.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: my-app
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: my-app
+    spec:
+      containers:
+      - image: nginx:1.20
+        name: nginx
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+          initialDelaySeconds: 10
+        resources:
+          requests:
+            cpu: 10m
+            memory: 100Mi
+          limits:
+            cpu: 10m
+            memory: 100Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d/
+      volumes:
+      - name: config
+        configMap:
+          name: my-configmap
+
+
+kubectl apply -f app/
+
+kubectl get pod
+kubectl describe pod my-deployment-
+
+
+------------------------------------------
+
+
+cat clusterip.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-app
+  type: ClusterIP
+
+
+kubectl apply -f clusterip.yaml
+kubectl get service
+kubectl get pod --show-labels
+kubectl describe svc my-service
+kubectl run test --image=amouat/network-utils -it bash
+# curl my-service
+# exit
+
+
+kubectl get svc  =  kubectl get service
+
+
+------------------------------------------------------------
+
+
+cat nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service-np
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-app
+  type: NodePort
+
+
+
+kubectl apply -f nodeport.yaml
+kubectl get nodes
+kubectl get svc
+
+curl -i 172.17.81.129:31587
+curl -i minikube:31587
+
+
+---------------------------------------------
+
+
+cat loadbalancer.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service-lb
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: my-app
+  type: LoadBalancer
+
+
+
+kubectl create -f loadbalancer.yaml
+kubectl get svc
+
+---------------------------------------------
+
+kubectl delete svc my-service-lb my-service-np
+kubectl delete deployments.apps --all
+kubectl delete pod test
+
+
+
+
+
+
+
+5.3.1 Ingress 
+
+
+Ingress не является сервисом, это отдельная абстракция. Ingress представляет собой манифест,  Ingress-контроллер – это приложение, работающее в Kubernetes.
+
+Ingress-контроллер представляет собой настроенный по манифесту веб-сервис или балансировщик нагрузки: Nginx, Haproxy или Envoy
+
+Пример ingress манифеста:
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+spec:
+  rules:
+  - host: foo.mydomain.com
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: my-service
+            port:
+              number: 80
+
+
+
+Добавляем сертификаты:
+1.Создаем секрет с сертификатом 
+kubectl create secret tls ${CERT_NAME} --key ${KEY_FILE} --cert ${CERT_FILE}
+2. kubectl get secrets
+apiVersion: v1
+data:
+  tls.crt: base64 encoded cert
+  tls.key: base64 encoded key
+kind: Secret
+metadata:
+  name: secret-tls
+  namespace: default
+type: kubernetes.io/tls
+
+3. Указываем сертификат в Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-ingress
+spec:
+  tls:
+  - hosts:
+    - sslfoo.com
+    secretName: secret-tls
+
+
+
+Можно сделать автогенерацию сертификата через letsencrypt
+1. Созадём автогенерацию сертификатов
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: hostname-ru
+  namespace: default
+spec:
+  acme:
+    config:
+    - domains:
+      - hostname.ru
+      - www.hostname.ru
+      http01:
+        ingress: ""
+        ingressClass: nginx
+  secretName: hostname-ru-tls
+  commonName: hostname.ru
+  dnsNames:
+  - hostname.ru
+  - www.hostname.ru
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+
+2. Подключаем сертификаты в ingress
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tls-ingress
+  annotations:
+    kubernetes.io/tls-acme:"true"
+
+ИЛИ
+
+certmanager.k8s.io/cluster-issuer: letsencrypt
+
+
+Аннотация представляет собой средство передачи дополнительных инструкций контроллеру или приложению, которое обрабатывает данный манифест. В случае с Ingress, взаимодействие происходит с Ingress Controller. Аннотация задает дополнительную логику выполнения, расширяя стандартные возможности манифеста.
+
+Каждый Ingress Controller имеет свой набор поддерживаемых аннотаций, которые можно найти в соответствующей документации
+
+Ingress Controller - это опреденённое количество подов с проксей и ЛБ в своём неймспейсе
+
+
+5.3.3 Практика (не делал https://kubernetes.io/docs/tasks/access-application-cluster/ingress-minikube/)
+
+
+cat nginx-ingress.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-ingress-nginx
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: my.edu.example
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: my-service
+            port:
+              number: 80
+
+
+kubectl apply -f nginx-ingress.yaml
+
+kubectl get pod -n ingress-nginx -o wide
+kubectl get ing
+
+
+curl my.edu.example
 
 
 
@@ -1379,14 +1908,81 @@ init-контейнеры завершают свою работу перед т
 
 
 
+6 Устройство кластера
+
+
+6.2.1 ETCD
+
+ETCD поддерживает механизм кворума, что обеспечивает отказоустойчивость кластера
+Обычно в кластере Kubernetes развертываются как минимум три реплики ETCD
+ETCD — это то, что он является центральным хранилищем данных в Kubernetes
+API Server сохраняет и извлекает всю информацию о состоянии объектов кластера, нод и других элементов в\из ETCD
+
+
+Запускается в контейнере, работает на master-нодах
+
+
+
+6.3.1 API Server
+
+API Server представляет собой центральный API Server, с которым взаимодействуют все компоненты кластера.
+API Server является единственным компонентом, который напрямую взаимодействует с базой данных ETCD
+Он отвечает за чтение и запись данных в ETCD, в то время как все остальные компоненты кластера получают доступ к данным и отправляют их через API Server
+
+API Server отвечает за валидацию данных
+
+Взаимодействовать с API server можно не только классическим способом, но и посредством отправки запросов напрямую, например, с использованием команды curl или через программный код. API Server отвечает за аутентификацию и авторизацию как компонентов самого кластера, так и пользователей, и приложений, работающих в нем.
+
+Запускается в контейнере, работает на master-нодах
+
+
+
+6.4.1 Controller-manager
+
+Представляет из себя набор контроллеров за состоянием кластера (ноды, поды, реплика сеты)
+В нём есть GarbageCollector
+
+Controller-manager общается с api server (ищет события)
+
+Генерирует описания replicaset'ов и pod'ов из объекта deployment
+
+Запускается в контейнере, работает на master-нодах
+
+
+6.5.1 Scheduler
+Отвечает за назначение подов на ноды
+
+Назначет поды на ноды
+Scheduler общается с api server (ищет события)
+Делает pod binding
+
+Запускается в контейнере, работает на master-нодах
+
+
+
+6.6.1 Kubelet
+Kubelet представляет собой агент (сервис), работающий на всех нодах в кластере Kubernetes
+Kubelet отвечает за взаимодействие с контейнерным интерфейсом на ноде, таким как Docker или containerd. Это единственный компонент, который не запускается в контейнере Docker в кластере Kubernetes. Вместо этого Kubelet взаимодействует напрямую с контейнерным демоном или любым контейнерным интерфейсом, который запущен на ноде.
+
+Kubelet выполняет создание и управление подами на ноде. Он отвечает за запуск контейнеров, создание необходимых ресурсов и поддержание их состояния в соответствии с указаниями из API Server.
+
+Kubelet также осуществляет регулярную синхронизацию статуса своей ноды с API Server. Он отправляет регулярные сигналы (пинги), подтверждающие, что нода остается доступной и функционирующей.
+
+
+
+
+6.7.1 kube-proxy
+
+kube-proxy работает на всех нодах в кластере Kubernetes
+
+Основная задача kube-proxy заключается в реализации сетевых абстракций кластера, в частности, в управлении сервисами. Он управляет сетевыми правилами на нодах, создавая специальные правила через IPVS или IPTables для обеспечения работы сервисов и маршрутизации трафика.
 
 
 
 
 
-
-
-
+Заключение:
+Все компоненты кластера следят за событиями в kube-API server
 
 
 
