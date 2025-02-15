@@ -183,7 +183,7 @@ SySRQ:
 
 
 Нагрузить систему:
-cpu
+cpu, RAM:
 stress
 
 
@@ -195,6 +195,9 @@ dd if=/dev/zero of=/dev/null﻿
 
 /dev/urandom | gzip > /dev/null
 
+
+RAM
+cat /dev/urandom | less +F
 
 
 from habr
