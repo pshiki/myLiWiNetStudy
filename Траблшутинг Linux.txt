@@ -156,6 +156,8 @@ findmnt --real
 
 du -hs /opt
 
+getcap
+setcap
 
 
 LOGS
