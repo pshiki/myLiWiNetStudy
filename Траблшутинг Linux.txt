@@ -28,6 +28,7 @@ strace ls
 strace -p xxxxx
 top
 systemctl status
+lsof
 
 LAN
 ping
