@@ -1,0 +1,30 @@
+первым интерпретируется "|" перенаправелние пайпом на std-in
+вторым интерпретируется перенаправление потоков ">" ">>" в файлы
+
+
+
+
+less out.txt > out.txt
+1) > out.txt
+2) less out.txt
+
+Плохой пример :)
+grep -v "^#" file.txt > file.txt
+
+
+
+перенаправление std-out одной программы на std-in другой программы
+ls -la /etc/ | less
+
+
+По умолчанию grep не производится по std-err, поэтому не будет работать
+ls -l nodir | grep no
+
+Перенаправить std-err на std-in
+ls -l nodir 2>&1 1> /dev/null | grep no
+1)std-out "ls -l nodir" направлен на std-in "grep"
+2) "2>&1" направить std-err на текущий std-out (это см. п.1) 
+теперь два разных потока std-out и std-err перенаправлены на std-in "grep"
+3)"1> /dev/null" направление потока std-out в /dev/null
+на это этапе std-err не меняет направление своего потока и продолжает смотреть в std-in grep
+
